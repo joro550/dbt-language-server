@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -49,19 +48,16 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 	initLog.Infof("has got manifest %v", manifest)
 
 	ROOT_DIR = params.WorkspaceFolders[0].URI
-
-	rootDir := strings.ReplaceAll(ROOT_DIR, "file://", "")
-	manifestName := fmt.Sprintf("%s/target/manifest.json", rootDir)
-	file, err := os.ReadFile(manifestName)
+	settings, err := LoadSettings(ROOT_DIR)
 	if err != nil {
-		initLog.Errorf("could not open file %s %v", manifestName, err)
-	} else {
-		initLog.Info("opened manifest file")
+		initLog.Errorf("ERROR %v", err)
+
+		return nil, err
 	}
 
-	err = json.Unmarshal(file, &manifest)
+	manifest, err = settings.LoadManifestFile()
 	if err != nil {
-		initLog.Errorf("could not convert to json %v", err)
+		initLog.Errorf("could not load manifest file %v", err)
 		return nil, err
 	}
 
@@ -126,6 +122,7 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	if !ok {
 		definitionLog.Infof("key not found %s", key)
 	} else {
+		definitionLog.Infof("everything good for now", key)
 	}
 
 	ok, reference := val.DoThing2(string(fileContent), params.Position)
