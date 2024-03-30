@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/tliron/commonlog"
@@ -101,16 +101,11 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
 	definitionLog.Infof("params %v", params)
 
-	fileContent, err := os.ReadFile(strings.ReplaceAll(params.TextDocument.URI, "file://", ""))
-	if err != nil {
-		definitionLog.Info("cannot read file")
-		return nil, err
-	}
+	file := filepath.Base(params.TextDocument.URI)
+	definitionLog.Infof("file %v", file)
 
 	textDocumentFilePath := strings.Split(params.TextDocument.URI, "/")
-
 	modelName := strings.ReplaceAll(textDocumentFilePath[len(textDocumentFilePath)-1], ".sql", "")
-
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, modelName)
 
 	definitionLog.Infof("firstKey %s", key)
@@ -119,17 +114,9 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 		return nil, nil
 	}
 
-	val.GetDefinition(params)
-
-	ok, reference := val.DoThing2(string(fileContent), params.Position)
-	if !ok {
-		definitionLog.Infof("reference could not be found %d %s", params.Position, reference)
-		return nil, nil
-	}
-
-	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, reference)
+	model, _ := val.GetDefinition(params)
+	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, model)
 	originalPath := manifest.Nodes[key].OriginalPath
-
 	filePath := fmt.Sprintf("%s/%s", ROOT_DIR, originalPath)
 
 	return protocol.Location{

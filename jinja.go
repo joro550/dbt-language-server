@@ -59,7 +59,7 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 		modelName := nameGroups[i]["name"]
 		references = append(references, ModelReference{
 			ModelName: modelName,
-			Range:     Range{Start: index[0], End: index[0] + index[1]},
+			Range:     Range{Start: index[0], End: index[1]},
 		})
 	}
 

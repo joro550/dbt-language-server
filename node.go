@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -92,7 +93,7 @@ func (n Node) DoThing2(code string, currentPosition protocol.Position) (bool, st
 	return false, currentLine
 }
 
-func (n Node) GetDefinition(params *protocol.DefinitionParams) error {
+func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
 	logger := commonlog.GetLogger("node.GetDefinition")
 	parser := NewJinjaParser()
 
@@ -100,13 +101,13 @@ func (n Node) GetDefinition(params *protocol.DefinitionParams) error {
 	if err != nil {
 
 		logger.Infof("couldn't read fire %v", err)
-		return err
+		return "", err
 	}
 
 	fileString := string(fileContent)
 	if !parser.HasJinjaBlocks(fileString) {
 		logger.Info("doesn't have jinja blocks")
-		return nil
+		return "", nil
 	}
 
 	// where are we in the file
@@ -114,12 +115,18 @@ func (n Node) GetDefinition(params *protocol.DefinitionParams) error {
 	fileLines := strings.Split(fileString, "\n")
 	for i := uint32(0); i < params.Position.Line; i++ {
 		position += len(fileLines[i])
+		fmt.Println("line", i)
 	}
 	position += int(params.Position.Character)
 	logger.Infof("calculated position %d", position)
 
 	refTags := parser.GetAllRefTags(fileString)
-	logger.Infof("reftags %d", refTags)
+	logger.Infof("reftags %v", refTags)
 
-	return nil
+	for _, tag := range refTags {
+		if position >= tag.Range.Start && position <= tag.Range.Start {
+			return tag.ModelName, nil
+		}
+	}
+	return "", nil
 }
