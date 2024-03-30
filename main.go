@@ -21,6 +21,7 @@ var (
 	version  string = "0.0.1"
 	handler  protocol.Handler
 	manifest Manifest
+	settings ProjectSettings
 	ROOT_DIR string
 )
 
@@ -38,20 +39,16 @@ func main() {
 	}
 
 	server := server.NewServer(&handler, lsName, false)
-	server.Log.Info("Hello mark")
-
 	server.RunStdio()
 }
 
 func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	initLog := commonlog.GetLoggerf("%s.init", lsName)
-	initLog.Infof("has got manifest %v", manifest)
 
 	ROOT_DIR = params.WorkspaceFolders[0].URI
 	settings, err := LoadSettings(ROOT_DIR)
 	if err != nil {
 		initLog.Errorf("ERROR %v", err)
-
 		return nil, err
 	}
 
@@ -62,7 +59,7 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 	}
 
 	capabilities := handler.CreateServerCapabilities()
-
+	initLog.Info("Returning initialized")
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
 		ServerInfo: &protocol.InitializeResultServerInfo{
@@ -102,7 +99,7 @@ func highlighHandler(context *glsp.Context, params *protocol.DocumentHighlightPa
 
 func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams) (any, error) {
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
-	definitionLog.Infof("text document %v", params.TextDocument)
+	definitionLog.Infof("params %v", params)
 
 	fileContent, err := os.ReadFile(strings.ReplaceAll(params.TextDocument.URI, "file://", ""))
 	if err != nil {
@@ -113,17 +110,16 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	textDocumentFilePath := strings.Split(params.TextDocument.URI, "/")
 
 	modelName := strings.ReplaceAll(textDocumentFilePath[len(textDocumentFilePath)-1], ".sql", "")
-	definitionLog.Infof("modelName %s", modelName)
 
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, modelName)
 
 	definitionLog.Infof("firstKey %s", key)
 	val, ok := manifest.Nodes[key]
 	if !ok {
-		definitionLog.Infof("key not found %s", key)
-	} else {
-		definitionLog.Infof("everything good for now", key)
+		return nil, nil
 	}
+
+	val.GetDefinition(params)
 
 	ok, reference := val.DoThing2(string(fileContent), params.Position)
 	if !ok {
@@ -132,7 +128,6 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	}
 
 	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, reference)
-	definitionLog.Infof("going to find key %s", key)
 	originalPath := manifest.Nodes[key].OriginalPath
 
 	filePath := fmt.Sprintf("%s/%s", ROOT_DIR, originalPath)

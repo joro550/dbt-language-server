@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
 	"regexp"
 	"strings"
 
+	"github.com/tliron/commonlog"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -88,4 +90,36 @@ func (n Node) DoThing2(code string, currentPosition protocol.Position) (bool, st
 	}
 
 	return false, currentLine
+}
+
+func (n Node) GetDefinition(params *protocol.DefinitionParams) error {
+	logger := commonlog.GetLogger("node.GetDefinition")
+	parser := NewJinjaParser()
+
+	fileContent, err := os.ReadFile(strings.ReplaceAll(params.TextDocument.URI, "file://", ""))
+	if err != nil {
+
+		logger.Infof("couldn't read fire %v", err)
+		return err
+	}
+
+	fileString := string(fileContent)
+	if !parser.HasJinjaBlocks(fileString) {
+		logger.Info("doesn't have jinja blocks")
+		return nil
+	}
+
+	// where are we in the file
+	position := 0
+	fileLines := strings.Split(fileString, "\n")
+	for i := uint32(0); i < params.Position.Line; i++ {
+		position += len(fileLines[i])
+	}
+	position += int(params.Position.Character)
+	logger.Infof("calculated position %d", position)
+
+	refTags := parser.GetAllRefTags(fileString)
+	logger.Infof("reftags %d", refTags)
+
+	return nil
 }
