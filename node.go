@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/tliron/commonlog"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -58,7 +56,7 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 	logger := commonlog.GetLogger("node.GetDefinition")
 	parser := NewJinjaParser()
 
-	fileContent, err := os.ReadFile(strings.ReplaceAll(params.FileUri, "file://", ""))
+	fileContent, err := ReadFileUri(params.FileUri)
 	if err != nil {
 
 		logger.Infof("couldn't read file %v", err)
@@ -66,20 +64,19 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 	}
 
 	fileString := string(fileContent)
-	if !parser.HasJinjaBlocks(fileString) {
-		logger.Info("doesn't have jinja blocks")
-		return "", nil
+	if parser.HasJinjaBlocks(fileString) {
+		positions := parser.GetJinjaPositions(fileString)
+		rawPosition := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
+
+		// Are we in a jinja block ?
+		if positionWithinRange(rawPosition, positions) {
+			return n.getJinjaDefinition(params, rawPosition, fileString, parser)
+		}
 	}
 
-	positions := parser.GetJinjaPositions(fileString)
-	rawPosition := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
+	// handle sql definition
 
-	// Are we in a jinja block ?
-	if !positionWithinRange(rawPosition, positions) {
-		return "", nil
-	}
-
-	return n.getJinjaDefinition(params, rawPosition, fileString, parser)
+	return "", nil
 }
 
 func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, content string, parser JinjaParser) (string, error) {

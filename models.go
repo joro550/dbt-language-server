@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -68,11 +67,8 @@ func (m *schemaModel) ToNode() []Node {
 }
 
 func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
-	rootDir := strings.ReplaceAll(ROOT_DIR, "file://", "")
-
-	dbtProjectFile := fmt.Sprintf("%s/dbt_project.yml", rootDir)
-	targetPath := fmt.Sprintf("%s/target", rootDir)
-	fileContent, err := os.ReadFile(dbtProjectFile)
+	dbtProjectFile := filepath.Join(workspaceFolder, "dbt_project.yml")
+	fileContent, err := ReadFileUri(dbtProjectFile)
 	if err != nil {
 		return ProjectSettings{}, err
 	}
@@ -84,10 +80,14 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 	}
 
 	return ProjectSettings{
-		RootPath:     rootDir,
+		RootPath:     workspaceFolder,
 		PathSettings: settings,
-		TargetPath:   targetPath,
+		TargetPath:   filepath.Join(workspaceFolder, "target"),
 	}, nil
+}
+
+func (ps ProjectSettings) GetRootDirectory() string {
+	return strings.ReplaceAll(ps.RootPath, "file://", "")
 }
 
 func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
@@ -95,7 +95,7 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 	schemaFiles := []Node{}
 
 	for _, path := range settings.PathSettings.ModelPath {
-		modelPath := filepath.Join(settings.RootPath, path)
+		modelPath := filepath.Join(settings.GetRootDirectory(), path)
 
 		err := filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
 			if info.IsDir() {

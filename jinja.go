@@ -62,7 +62,7 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 
 	modelIndex := jp.refPattern.SubexpIndex("model")
 	projectIndex := jp.refPattern.SubexpIndex("project")
-	matches := jp.refPattern.FindAllStringSubmatch(string(byteContent), -1)
+	matches := jp.refPattern.FindAllStringSubmatch(content, -1)
 
 	references := []ModelReference{}
 	for i, index := range resultIndicies {
@@ -94,11 +94,11 @@ func (jp JinjaParser) GetMacros(content string) []MacroReference {
 
 	macroNames := []MacroReference{}
 	functionIndex := jp.macroPattern.SubexpIndex("function_name")
-	matches := jp.macroPattern.FindAllStringSubmatch(string(byteContent), -1)
+	matches := jp.macroPattern.FindAllStringSubmatch(content, -1)
 
-	for i := range matches {
+	for i, match := range matches {
 
-		functionName := matches[i][functionIndex]
+		functionName := match[functionIndex]
 		if functionName == "" || slices.Contains(keywords, functionName) {
 			continue
 		}

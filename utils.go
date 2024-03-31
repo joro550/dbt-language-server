@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -31,4 +32,8 @@ func positionWithinRange(rawPosition int, ranges []Range) bool {
 		}
 	}
 	return false
+}
+
+func ReadFileUri(fileUri string) ([]byte, error) {
+	return os.ReadFile(strings.ReplaceAll(fileUri, "file://", ""))
 }
