@@ -10,8 +10,9 @@ import (
 )
 
 type Manifest struct {
-	Nodes    map[string]Node `json:"nodes"`
-	Metadata Metadata        `json:"metadata"`
+	Nodes    map[string]Node  `json:"nodes"`
+	Macros   map[string]Macro `json:"macros"`
+	Metadata Metadata         `json:"metadata"`
 }
 
 type Metadata struct {
@@ -19,13 +20,20 @@ type Metadata struct {
 }
 
 type Node struct {
+	Columns      map[string]NodeColumn
 	Name         string  `json:"name"`
 	Description  string  `json:"description"`
 	OriginalPath string  `json:"original_file_path"`
 	RawCode      string  `json:"raw_code"`
 	Depends      Depends `json:"depends_on"`
-	Columns      map[string]NodeColumn
 }
+
+type Macro struct {
+	Name         string `json:"name"`
+	Description  string `json:"description"`
+	OriginalPath string `json:"original_file_path"`
+}
+
 type NodeColumn struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -37,8 +45,13 @@ type Depends struct {
 
 type DefinitionRequest struct {
 	FileUri     string
-	Position    protocol.Position
 	ProjectName string
+	Manifest    Manifest
+	Position    protocol.Position
+}
+
+type DefinitionResponse struct {
+	KeyName string
 }
 
 func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
@@ -66,19 +79,31 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 		return "", nil
 	}
 
-	refTags := parser.GetAllRefTags(fileString)
+	return n.getJinjaDefinition(params, rawPosition, fileString, parser)
+}
+
+func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, content string, parser JinjaParser) (string, error) {
+	refTags := parser.GetAllRefTags(content)
 	for _, tag := range refTags {
 		if rawPosition >= tag.Range.Start && rawPosition <= tag.Range.End {
 			model := fmt.Sprintf("model.%s.%s", params.ProjectName, tag.ModelName)
-			return model, nil
+			node, ok := params.Manifest.Nodes[model]
+			if !ok {
+				return "", nil
+			}
+			return node.OriginalPath, nil
 		}
 	}
 
-	macros := parser.GetMacros(fileString)
+	macros := parser.GetMacros(content)
 	for _, macro := range macros {
 		if rawPosition >= macro.Range.Start && rawPosition <= macro.Range.End {
 			model := fmt.Sprintf("macro.%s.%s", params.ProjectName, macro.ModelName)
-			return model, nil
+			node, ok := params.Manifest.Macros[model]
+			if !ok {
+				return "", nil
+			}
+			return node.OriginalPath, nil
 		}
 	}
 

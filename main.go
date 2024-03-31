@@ -120,6 +120,7 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	model, err := val.GetDefinition(DefinitionRequest{
 		FileUri:     params.TextDocument.URI,
 		Position:    params.Position,
+		Manifest:    manifest,
 		ProjectName: manifest.Metadata.ProjectName,
 	})
 	if err != nil {
