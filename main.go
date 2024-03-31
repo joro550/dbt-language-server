@@ -54,6 +54,13 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 		return nil, err
 	}
 
+	schemas, err := settings.GetSchemaFiles()
+	if err != nil {
+		initLog.Errorf("Could not load schema files %v", err)
+	} else {
+		initLog.Infof("Loaded Schema file %v", schemas)
+	}
+
 	manifest, err = settings.LoadManifestFile()
 	if err != nil {
 		initLog.Errorf("could not load manifest file %v", err)

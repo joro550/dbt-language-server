@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tliron/commonlog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,26 +33,24 @@ type Range struct {
 	End   int
 }
 
-type model struct {
+type schemaModel struct {
 	ModelInformation []struct {
-		Name        string        `yaml:"name"`
-		Description string        `yaml:"description"`
-		Columns     []modelColumn `yaml:"columns"`
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+		Columns     []struct {
+			Name        string `yaml:"name"`
+			Description string `yaml:"description"`
+		} `yaml:"columns"`
 	} `yaml:"models"`
 }
 
-type modelColumn struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-}
-
-func (m *model) ToNode() []Node {
+func (m *schemaModel) ToNode() []Node {
 	node := []Node{}
 	for _, info := range m.ModelInformation {
 
 		columns := map[string]NodeColumn{}
 		for _, column := range info.Columns {
-			columns[column.Name] = column.toNodeColumns()
+			columns[column.Name] = NodeColumn(column)
 		}
 
 		node = append(node, Node{
@@ -61,13 +60,6 @@ func (m *model) ToNode() []Node {
 		})
 	}
 	return node
-}
-
-func (m *modelColumn) toNodeColumns() NodeColumn {
-	return NodeColumn{
-		Name:        m.Name,
-		Description: m.Description,
-	}
 }
 
 func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
@@ -94,26 +86,34 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 }
 
 func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
+	logger := commonlog.GetLoggerf("%s.schema", "settings")
 	schemaFiles := []Node{}
+
 	for _, path := range settings.PathSettings.ModelPath {
 		modelPath := filepath.Join(settings.RootPath, path)
 
-		filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
+		err := filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
 			if info.IsDir() {
 				return nil
 			}
 
-			extenstion := filepath.Ext(path)
-			if extenstion != "yaml" || filepath.Ext(path) != "yml" {
+			extension := filepath.Ext(info.Name())
+
+			logger.Infof("Extension : %v", extension)
+			if extension != `.yaml` && extension != `.yml` {
 				return nil
 			}
 
 			fileContent, err := os.ReadFile(path)
+			logger.Infof("file : %v", path)
 			if err != nil {
 				return err
 			}
-			model := model{}
+
+			model := schemaModel{}
 			err = yaml.Unmarshal(fileContent, &model)
+
+			logger.Infof("file : %v", model)
 			if err != nil {
 				return err
 			}
@@ -122,6 +122,9 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 
 			return nil
 		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return schemaFiles, nil
