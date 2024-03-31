@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
@@ -119,17 +118,16 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	}
 
 	model, err := val.GetDefinition(DefinitionRequest{
-		FileUri:  params.TextDocument.URI,
-		Position: params.Position,
+		FileUri:     params.TextDocument.URI,
+		Position:    params.Position,
+		ProjectName: manifest.Metadata.ProjectName,
 	})
 	if err != nil {
 		definitionLog.Infof("getting the definition failed %v", err)
 		return nil, err
 	}
 
-	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, model)
-
-	referencedNode, ok := manifest.Nodes[key]
+	referencedNode, ok := manifest.Nodes[model]
 	if !ok {
 		definitionLog.Infof("could not referenced key %v", key)
 		return nil, nil
@@ -183,10 +181,4 @@ func fileChanged(context *glsp.Context, params *protocol.DidChangeWatchedFilesPa
 	//
 	// }
 	return nil
-}
-
-func getModelNameFromFilePath(filePath string) string {
-	file := filepath.Base(filePath)
-	file = file[:strings.Index(file, ".")]
-	return file
 }

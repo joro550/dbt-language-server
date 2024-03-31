@@ -9,7 +9,7 @@ import (
 
 func TestSchemaFile(t *testing.T) {
 	fileContent, _ := os.ReadFile("./tests/schema.yml")
-	model := model{}
+	model := schemaModel{}
 	err := yaml.Unmarshal(fileContent, &model)
 	if err != nil {
 		t.Errorf("error %v", err)

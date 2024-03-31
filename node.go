@@ -36,8 +36,9 @@ type Depends struct {
 }
 
 type DefinitionRequest struct {
-	FileUri  string
-	Position protocol.Position
+	FileUri     string
+	Position    protocol.Position
+	ProjectName string
 }
 
 func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
@@ -57,25 +58,29 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 		return "", nil
 	}
 
-	refTags := parser.GetAllRefTags(fileString)
-	position := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
+	positions := parser.GetJinjaPositions(fileString)
+	rawPosition := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
 
+	// Are we in a jinja block ?
+	if !positionWithinRange(rawPosition, positions) {
+		return "", nil
+	}
+
+	refTags := parser.GetAllRefTags(fileString)
 	for _, tag := range refTags {
-		if position >= tag.Range.Start && position <= tag.Range.End {
-			return tag.ModelName, nil
+		if rawPosition >= tag.Range.Start && rawPosition <= tag.Range.End {
+			model := fmt.Sprintf("model.%s.%s", params.ProjectName, tag.ModelName)
+			return model, nil
 		}
 	}
-	return "", nil
-}
 
-func getRawPositionInFile(content string, line, character uint32) int {
-	// where are we in the file
-	position := 0
-	fileLines := strings.Split(content, "\n")
-	for i := uint32(0); i < line; i++ {
-		position += len(fileLines[i])
-		fmt.Println("line", i)
+	macros := parser.GetMacros(fileString)
+	for _, macro := range macros {
+		if rawPosition >= macro.Range.Start && rawPosition <= macro.Range.End {
+			model := fmt.Sprintf("macro.%s.%s", params.ProjectName, macro.ModelName)
+			return model, nil
+		}
 	}
-	position += int(character)
-	return position
+
+	return "", nil
 }

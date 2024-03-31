@@ -28,6 +28,11 @@ type ModelReference struct {
 	Range     Range
 }
 
+type MacroReference struct {
+	ModelName string
+	Range     Range
+}
+
 type Range struct {
 	Start int
 	End   int
