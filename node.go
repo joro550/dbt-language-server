@@ -3,16 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 
 	"github.com/tliron/commonlog"
 	protocol "github.com/tliron/glsp/protocol_3_16"
-)
-
-var (
-	jinjaNode, _ = regexp.Compile("{{[\\s\\S]*}}")
-	name, _      = regexp.Compile("(?:'|\")[\\S]*(?:'|\")")
 )
 
 type Manifest struct {
@@ -27,70 +21,12 @@ type Metadata struct {
 type Node struct {
 	Name         string  `json:"name"`
 	OriginalPath string  `json:"original_file_path"`
-	Depends      Depends `json:"depends_on"`
 	RawCode      string  `json:"raw_code"`
+	Depends      Depends `json:"depends_on"`
 }
 
 type Depends struct {
 	Nodes []string `json:"nodes"`
-}
-
-func (n Node) DoThing(currentPosition protocol.Position) (bool, string) {
-	lines := strings.Split(n.RawCode, "\n")
-
-	currentLine := lines[currentPosition.Line]
-	currentLineAsBytes := []byte(currentLine)
-	match := jinjaNode.Match(currentLineAsBytes)
-
-	if !match {
-		return false, currentLine
-	}
-
-	indicies := name.FindAllIndex(currentLineAsBytes, -1)
-	if indicies == nil {
-		return false, currentLine
-	}
-
-	for _, index := range indicies {
-		start := uint32(index[0])
-		end := uint32(index[1])
-
-		if currentPosition.Character >= start && currentPosition.Character <= end {
-			reference := currentLine[start+1 : end-1]
-			return true, reference
-		}
-	}
-
-	return false, currentLine
-}
-
-func (n Node) DoThing2(code string, currentPosition protocol.Position) (bool, string) {
-	lines := strings.Split(code, "\n")
-
-	currentLine := lines[currentPosition.Line]
-	currentLineAsBytes := []byte(currentLine)
-	match := jinjaNode.Match(currentLineAsBytes)
-
-	if !match {
-		return false, currentLine
-	}
-
-	indicies := name.FindAllIndex(currentLineAsBytes, -1)
-	if indicies == nil {
-		return false, currentLine
-	}
-
-	for _, index := range indicies {
-		start := uint32(index[0])
-		end := uint32(index[1])
-
-		if currentPosition.Character >= start && currentPosition.Character <= end {
-			reference := currentLine[start+1 : end-1]
-			return true, reference
-		}
-	}
-
-	return false, currentLine
 }
 
 func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
@@ -111,17 +47,8 @@ func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
 	}
 
 	// where are we in the file
-	position := 0
-	fileLines := strings.Split(fileString, "\n")
-	for i := uint32(0); i < params.Position.Line; i++ {
-		position += len(fileLines[i])
-		fmt.Println("line", i)
-	}
-	position += int(params.Position.Character)
-	logger.Infof("calculated position %d", position)
-
+	position := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
 	refTags := parser.GetAllRefTags(fileString)
-	logger.Infof("reftags %v", refTags)
 
 	for _, tag := range refTags {
 		if position >= tag.Range.Start && position <= tag.Range.Start {
@@ -129,4 +56,16 @@ func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+func getRawPositionInFile(content string, line, character uint32) int {
+	// where are we in the file
+	position := 0
+	fileLines := strings.Split(content, "\n")
+	for i := uint32(0); i < line; i++ {
+		position += len(fileLines[i])
+		fmt.Println("line", i)
+	}
+	position += int(character)
+	return position
 }

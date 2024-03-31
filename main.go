@@ -101,29 +101,33 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
 	definitionLog.Infof("params %v", params)
 
-	file := filepath.Base(params.TextDocument.URI)
-	definitionLog.Infof("file %v", file)
+	file := getModelNameFromFilePath(params.TextDocument.URI)
+	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
 
-	textDocumentFilePath := strings.Split(params.TextDocument.URI, "/")
-	modelName := strings.ReplaceAll(textDocumentFilePath[len(textDocumentFilePath)-1], ".sql", "")
-	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, modelName)
-
-	definitionLog.Infof("firstKey %s", key)
 	val, ok := manifest.Nodes[key]
 	if !ok {
 		return nil, nil
 	}
 
-	model, _ := val.GetDefinition(params)
+	model, err := val.GetDefinition(params)
+	if err != nil {
+		return nil, err
+	}
+
 	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, model)
 	originalPath := manifest.Nodes[key].OriginalPath
-	filePath := fmt.Sprintf("%s/%s", ROOT_DIR, originalPath)
 
 	return protocol.Location{
-		URI: filePath,
+		URI: filepath.Join(ROOT_DIR, originalPath),
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 0},
 		},
 	}, nil
+}
+
+func getModelNameFromFilePath(filePath string) string {
+	file := filepath.Base(filePath)
+	file = file[:strings.Index(file, ".")]
+	return file
 }

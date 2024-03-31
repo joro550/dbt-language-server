@@ -5,3 +5,6 @@ dev:
 
 prod:
 	go build -ldflags "-s -w" -o out/prod/dbt-lsp
+
+test:
+	go test . -v

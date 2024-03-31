@@ -16,7 +16,7 @@ func NewJinjaParser() JinjaParser {
 	expressionPattern, _ := regexp.Compile(`{{[\s\S]*?}}`)
 	statementPattern, _ := regexp.Compile(`{%[\s\S]*?%}`)
 	commentPattern, _ := regexp.Compile(`{#[\s\S]*?#}`)
-	refPattern := regexp.MustCompile(`{{\s*ref\s*\(\s*['|"](?<name>.*?)\s*['|"]\)\s*}}`)
+	refPattern := regexp.MustCompile(`{{\s*ref\s*\(\s*['|"](?<project>[a-z_]*?)\s*['|"]\s*(,?\s*['|"](?<model>[a-z_]*?)\s*['|"])?\)\s*}}`)
 
 	return JinjaParser{
 		expressionPattern: expressionPattern,
@@ -56,7 +56,14 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 
 	references := []ModelReference{}
 	for i, index := range resultIndicies {
-		modelName := nameGroups[i]["name"]
+
+		modelName := ""
+		if nameGroups[i]["model"] != "" {
+			modelName = nameGroups[i]["model"]
+		} else {
+			modelName = nameGroups[i]["project"]
+		}
+
 		references = append(references, ModelReference{
 			ModelName: modelName,
 			Range:     Range{Start: index[0], End: index[1]},
