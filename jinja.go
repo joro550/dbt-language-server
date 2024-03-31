@@ -60,30 +60,18 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 		return []ModelReference{}
 	}
 
-	nameGroups := []map[string]string{}
-	names := jp.refPattern.SubexpNames()
+	modelIndex := jp.refPattern.SubexpIndex("model")
+	projectIndex := jp.refPattern.SubexpIndex("project")
 	matches := jp.refPattern.FindAllStringSubmatch(string(byteContent), -1)
-
-	for i := range matches {
-		matchMap := make(map[string]string)
-
-		for j, name := range names {
-			if j != 0 && name != "" {
-				matchMap[name] = matches[i][j]
-			}
-		}
-
-		nameGroups = append(nameGroups, matchMap)
-	}
 
 	references := []ModelReference{}
 	for i, index := range resultIndicies {
 
 		modelName := ""
-		if nameGroups[i]["model"] != "" {
-			modelName = nameGroups[i]["model"]
+		if matches[i][modelIndex] != "" {
+			modelName = matches[i][modelIndex]
 		} else {
-			modelName = nameGroups[i]["project"]
+			modelName = matches[i][projectIndex]
 		}
 
 		references = append(references, ModelReference{
@@ -105,20 +93,13 @@ func (jp JinjaParser) GetMacros(content string) []MacroReference {
 	}
 
 	macroNames := []MacroReference{}
-	names := jp.macroPattern.SubexpNames()
+	functionIndex := jp.macroPattern.SubexpIndex("function_name")
 	matches := jp.macroPattern.FindAllStringSubmatch(string(byteContent), -1)
 
 	for i := range matches {
-		matchMap := make(map[string]string)
 
-		for j, name := range names {
-			if j != 0 && name != "" {
-				matchMap[name] = matches[i][j]
-			}
-		}
-
-		functionName, ok := matchMap["function_name"]
-		if !ok || functionName == "" || slices.Contains(keywords, functionName) {
+		functionName := matches[i][functionIndex]
+		if functionName == "" || slices.Contains(keywords, functionName) {
 			continue
 		}
 
