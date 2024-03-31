@@ -31,11 +31,13 @@ func main() {
 	commonlog.Configure(1, &path)
 
 	handler = protocol.Handler{
-		Initialize:             initialize,
-		Initialized:            initialized,
-		Shutdown:               shutdown,
-		SetTrace:               setTrace,
-		TextDocumentDefinition: definitionHandler,
+		Initialize:                     initialize,
+		Initialized:                    initialized,
+		Shutdown:                       shutdown,
+		SetTrace:                       setTrace,
+		TextDocumentDefinition:         definitionHandler,
+		TextDocumentHover:              hoverHandler,
+		WorkspaceDidChangeWatchedFiles: fileChanged,
 	}
 
 	server := server.NewServer(&handler, lsName, false)
@@ -83,7 +85,7 @@ func setTrace(context *glsp.Context, params *protocol.SetTraceParams) error {
 	return nil
 }
 
-func highlighHandler(context *glsp.Context, params *protocol.DocumentHighlightParams) ([]protocol.DocumentHighlight, error) {
+func highlighHandler(_ *glsp.Context, _ *protocol.DocumentHighlightParams) ([]protocol.DocumentHighlight, error) {
 	highlightLog := commonlog.GetLoggerf("%s.highlighter", lsName)
 	text := protocol.DocumentHighlightKindText
 	documentHighlights := []protocol.DocumentHighlight{
@@ -99,31 +101,81 @@ func highlighHandler(context *glsp.Context, params *protocol.DocumentHighlightPa
 
 func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams) (any, error) {
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
-	definitionLog.Infof("params %v", params)
 
 	file := getModelNameFromFilePath(params.TextDocument.URI)
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
 
 	val, ok := manifest.Nodes[key]
 	if !ok {
+		definitionLog.Infof("could not find initial key %v", key)
 		return nil, nil
 	}
 
-	model, err := val.GetDefinition(params)
+	model, err := val.GetDefinition(DefinitionRequest{
+		FileUri:  params.TextDocument.URI,
+		Position: params.Position,
+	})
 	if err != nil {
+		definitionLog.Infof("getting the definition failed %v", err)
 		return nil, err
 	}
 
 	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, model)
-	originalPath := manifest.Nodes[key].OriginalPath
+
+	referencedNode, ok := manifest.Nodes[key]
+	if !ok {
+		definitionLog.Infof("could not referenced key %v", key)
+		return nil, nil
+	}
 
 	return protocol.Location{
-		URI: filepath.Join(ROOT_DIR, originalPath),
+		URI: filepath.Join(ROOT_DIR, referencedNode.OriginalPath),
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 0},
 		},
 	}, nil
+}
+
+func hoverHandler(context *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+	definitionLog := commonlog.GetLoggerf("%s.hover", lsName)
+
+	file := getModelNameFromFilePath(params.TextDocument.URI)
+	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
+
+	val, ok := manifest.Nodes[key]
+	if !ok {
+		definitionLog.Infof("could not find initial key %v", key)
+		return nil, nil
+	}
+
+	model, err := val.GetDefinition(DefinitionRequest{
+		FileUri:  params.TextDocument.URI,
+		Position: params.Position,
+	})
+	if err != nil {
+		definitionLog.Infof("getting the definition failed %v", err)
+		return nil, err
+	}
+
+	key = fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, model)
+
+	referencedNode, ok := manifest.Nodes[key]
+	if !ok {
+		definitionLog.Infof("could not referenced key %v", key)
+		return nil, nil
+	}
+
+	return &protocol.Hover{Contents: referencedNode.Description}, nil
+}
+
+func fileChanged(context *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
+	// for _, uri := range params.Changes {
+	// 	file := strings.ReplaceAll(uri.URI, "file://", "")
+	//
+	//
+	// }
+	return nil
 }
 
 func getModelNameFromFilePath(filePath string) string {

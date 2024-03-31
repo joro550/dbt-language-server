@@ -20,23 +20,34 @@ type Metadata struct {
 
 type Node struct {
 	Name         string  `json:"name"`
+	Description  string  `json:"description"`
 	OriginalPath string  `json:"original_file_path"`
 	RawCode      string  `json:"raw_code"`
 	Depends      Depends `json:"depends_on"`
+	Columns      map[string]NodeColumn
+}
+type NodeColumn struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type Depends struct {
 	Nodes []string `json:"nodes"`
 }
 
-func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
+type DefinitionRequest struct {
+	FileUri  string
+	Position protocol.Position
+}
+
+func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 	logger := commonlog.GetLogger("node.GetDefinition")
 	parser := NewJinjaParser()
 
-	fileContent, err := os.ReadFile(strings.ReplaceAll(params.TextDocument.URI, "file://", ""))
+	fileContent, err := os.ReadFile(strings.ReplaceAll(params.FileUri, "file://", ""))
 	if err != nil {
 
-		logger.Infof("couldn't read fire %v", err)
+		logger.Infof("couldn't read file %v", err)
 		return "", err
 	}
 
@@ -46,12 +57,11 @@ func (n Node) GetDefinition(params *protocol.DefinitionParams) (string, error) {
 		return "", nil
 	}
 
-	// where are we in the file
-	position := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
 	refTags := parser.GetAllRefTags(fileString)
+	position := getRawPositionInFile(fileString, params.Position.Line, params.Position.Character)
 
 	for _, tag := range refTags {
-		if position >= tag.Range.Start && position <= tag.Range.Start {
+		if position >= tag.Range.Start && position <= tag.Range.End {
 			return tag.ModelName, nil
 		}
 	}

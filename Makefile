@@ -1,4 +1,3 @@
-
 dev:
 	rm out/dbt-lsp
 	go build -o out/dbt-lsp .

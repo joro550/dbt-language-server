@@ -13,9 +13,9 @@ type JinjaParser struct {
 }
 
 func NewJinjaParser() JinjaParser {
-	expressionPattern, _ := regexp.Compile(`{{[\s\S]*?}}`)
-	statementPattern, _ := regexp.Compile(`{%[\s\S]*?%}`)
-	commentPattern, _ := regexp.Compile(`{#[\s\S]*?#}`)
+	expressionPattern := regexp.MustCompile(`{{[\s\S]*?}}`)
+	statementPattern := regexp.MustCompile(`{%[\s\S]*?%}`)
+	commentPattern := regexp.MustCompile(`{#[\s\S]*?#}`)
 	refPattern := regexp.MustCompile(`{{\s*ref\s*\(\s*['|"](?<project>[a-z_]*?)\s*['|"]\s*(,?\s*['|"](?<model>[a-z_]*?)\s*['|"])?\)\s*}}`)
 
 	return JinjaParser{
