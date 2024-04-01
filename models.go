@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -109,7 +108,7 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 				return nil
 			}
 
-			fileContent, err := os.ReadFile(path)
+			fileContent, err := ReadFileUri(path)
 			logger.Infof("file : %v", path)
 			if err != nil {
 				return err
@@ -137,7 +136,7 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 
 func (settings ProjectSettings) LoadManifestFile() (Manifest, error) {
 	manifestPath := filepath.Join(settings.TargetPath, "manifest.json")
-	file, err := os.ReadFile(manifestPath)
+	file, err := ReadFileUri(manifestPath)
 	if err != nil {
 		return Manifest{}, err
 	}

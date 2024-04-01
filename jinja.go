@@ -21,7 +21,7 @@ func NewJinjaParser() JinjaParser {
 	commentPattern := regexp.MustCompile(`{#[\s\S]*?#}`)
 	effectiveJinjaPattern := regexp.MustCompile(`{{[\s\S]*?}}|{%[\s\S]*?%}`)
 	refPattern := regexp.MustCompile(`{{\s*ref\s*\(\s*['|"](?<project>[a-z_]*?)\s*['|"]\s*(,?\s*['|"](?<model>[a-z_]*?)\s*['|"])?\)\s*}}`)
-	macroPattern := regexp.MustCompile(`{{\s*(?<function_name>[a-zA-Z_]*)\s*\([\s\S]*\)\s*}}`)
+	macroPattern := regexp.MustCompile(`{{\s*(?<function_name>[a-zA-Z_]*)\s*\([\sA-Za-z='_0-9"]*\)\s*}}`)
 
 	return JinjaParser{
 		expressionPattern:     expressionPattern,
@@ -39,7 +39,7 @@ func (jp JinjaParser) HasJinjaBlocks(content string) bool {
 
 func (jp JinjaParser) GetJinjaPositions(content string) []Range {
 	byteContent := []byte(content)
-	resultIndicies := jp.refPattern.FindAllIndex(byteContent, -1)
+	resultIndicies := jp.effectiveJinjaPattern.FindAllIndex(byteContent, -1)
 
 	if resultIndicies == nil {
 		return []Range{}
@@ -84,7 +84,7 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 }
 
 func (jp JinjaParser) GetMacros(content string) []MacroReference {
-	keywords := []string{"ref"}
+	keywords := []string{"ref", "config"}
 	byteContent := []byte(content)
 	resultIndicies := jp.macroPattern.FindAllIndex(byteContent, -1)
 

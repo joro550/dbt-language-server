@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+var fileRegex = regexp.MustCompile(`file:`)
 
 func getModelNameFromFilePath(filePath string) string {
 	file := filepath.Base(filePath)
@@ -35,5 +38,6 @@ func positionWithinRange(rawPosition int, ranges []Range) bool {
 }
 
 func ReadFileUri(fileUri string) ([]byte, error) {
-	return os.ReadFile(strings.ReplaceAll(fileUri, "file://", ""))
+	fileNameAsBytes := fileRegex.ReplaceAll([]byte(fileUri), []byte(""))
+	return os.ReadFile(string(fileNameAsBytes))
 }

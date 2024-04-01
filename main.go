@@ -128,14 +128,8 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 		return nil, err
 	}
 
-	referencedNode, ok := manifest.Nodes[model]
-	if !ok {
-		definitionLog.Infof("could not referenced key %v", key)
-		return nil, nil
-	}
-
 	return protocol.Location{
-		URI: filepath.Join(ROOT_DIR, referencedNode.OriginalPath),
+		URI: filepath.Join(ROOT_DIR, model.FileName),
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 0},

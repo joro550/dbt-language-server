@@ -49,10 +49,10 @@ type DefinitionRequest struct {
 }
 
 type DefinitionResponse struct {
-	KeyName string
+	FileName string
 }
 
-func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
+func (n Node) GetDefinition(params DefinitionRequest) (DefinitionResponse, error) {
 	logger := commonlog.GetLogger("node.GetDefinition")
 	parser := NewJinjaParser()
 
@@ -60,7 +60,7 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 	if err != nil {
 
 		logger.Infof("couldn't read file %v", err)
-		return "", err
+		return DefinitionResponse{}, err
 	}
 
 	fileString := string(fileContent)
@@ -76,33 +76,36 @@ func (n Node) GetDefinition(params DefinitionRequest) (string, error) {
 
 	// handle sql definition
 
-	return "", nil
+	return DefinitionResponse{}, nil
 }
 
-func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, content string, parser JinjaParser) (string, error) {
+func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, content string, parser JinjaParser) (DefinitionResponse, error) {
+	logger := commonlog.GetLogger("lsp.getJinjaDefinition")
+
 	refTags := parser.GetAllRefTags(content)
 	for _, tag := range refTags {
 		if rawPosition >= tag.Range.Start && rawPosition <= tag.Range.End {
 			model := fmt.Sprintf("model.%s.%s", params.ProjectName, tag.ModelName)
 			node, ok := params.Manifest.Nodes[model]
 			if !ok {
-				return "", nil
+				return DefinitionResponse{}, nil
 			}
-			return node.OriginalPath, nil
+			return DefinitionResponse{FileName: node.OriginalPath}, nil
 		}
 	}
 
 	macros := parser.GetMacros(content)
+	logger.Infof("could not find a ref tag trying macro %v", macros)
 	for _, macro := range macros {
 		if rawPosition >= macro.Range.Start && rawPosition <= macro.Range.End {
 			model := fmt.Sprintf("macro.%s.%s", params.ProjectName, macro.ModelName)
 			node, ok := params.Manifest.Macros[model]
 			if !ok {
-				return "", nil
+				return DefinitionResponse{}, nil
 			}
-			return node.OriginalPath, nil
+			return DefinitionResponse{FileName: node.OriginalPath}, nil
 		}
 	}
 
-	return "", nil
+	return DefinitionResponse{}, nil
 }
