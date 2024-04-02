@@ -28,7 +28,7 @@ jobs:
       run: go build -o out/dbt-lsp .
 
     - name: Windows Build
-      run: GOOS=windows GOARCH=amd64 go build -o out/dbt-lsp .
+      run: GOOS=windows GOARCH=amd64 go build -o out/dbt-lsp.exe .
       
     - name: Test
       run: go test -v ./...
