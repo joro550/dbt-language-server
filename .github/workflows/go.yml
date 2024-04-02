@@ -13,6 +13,9 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
     steps:
     - uses: actions/checkout@v3
 
@@ -25,3 +28,11 @@ jobs:
       run: go build -o out/dbt-lsp .
     - name: Test
       run: go test -v ./...
+
+    - name: releae
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "out/**"
+        tag: 0.0.0.${{ github.run_id }}
+        replacesArtifacts: true
+        removeArtifacts: true
