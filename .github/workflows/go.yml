@@ -27,13 +27,15 @@ jobs:
     - name: Build
       run: go build -o out/dbt-lsp .
 
-    - name: Windows Build
-      run: GOOS=windows GOARCH=amd64 go build -o out/dbt-lsp.exe .
-      
-    - name: Test
-      run: go test -v ./...
+    - name: Generate build files
+      uses: thatisuday/go-cross-build@v1
+      with:
+          platforms: 'linux/amd64, darwin/amd64, windows/amd64'
+          name: 'dbt-lsp'
+          compress: 'true'
+          dest: '/out'
 
-    - name: releae
+    - name: release
       uses: ncipollo/release-action@v1
       with:
         artifacts: "out/**"
