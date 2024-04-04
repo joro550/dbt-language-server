@@ -23,17 +23,12 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.22'
-
+        
     - name: Build
       run: go build -o out/dbt-lsp .
 
-    - name: Generate build files
-      uses: thatisuday/go-cross-build@v1
-      with:
-          platforms: 'linux/amd64, darwin/amd64, windows/amd64'
-          name: 'dbt-lsp'
-          compress: 'true'
-          dest: '/out'
+    - name: Windows Build
+      run: go build -buildmode exe -o out/dbt-lsp.exe .
 
     - name: release
       uses: ncipollo/release-action@v1
