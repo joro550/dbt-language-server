@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/tliron/commonlog"
@@ -26,8 +27,12 @@ var (
 
 func main() {
 	// This increases logging verbosity (optional)
-	path := "/root/dev/go/dbt-language-server/out/log.txt"
-	commonlog.Configure(1, &path)
+	ex, err := os.Executable()
+	if err != nil {
+		panic("couldn't init")
+	}
+	log := filepath.Join(filepath.Dir(ex), "log.txt")
+	commonlog.Configure(1, &log)
 
 	handler = protocol.Handler{
 		Initialize:                     initialize,
