@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -38,6 +39,6 @@ func positionWithinRange(rawPosition int, ranges []Range) bool {
 }
 
 func ReadFileUri(fileUri string) ([]byte, error) {
-	fileNameAsBytes := fileRegex.ReplaceAll([]byte(fileUri), []byte(""))
-	return os.ReadFile(string(fileNameAsBytes))
+	u, _ := url.ParseRequestURI(fileUri)
+	return os.ReadFile(u.Path)
 }

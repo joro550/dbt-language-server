@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"io/fs"
+	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/tliron/commonlog"
 	"gopkg.in/yaml.v3"
@@ -86,7 +86,8 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 }
 
 func (ps ProjectSettings) GetRootDirectory() string {
-	return strings.ReplaceAll(ps.RootPath, "file://", "")
+	u, _ := url.ParseRequestURI(ps.RootPath)
+	return u.Path
 }
 
 func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
