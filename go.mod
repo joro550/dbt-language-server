@@ -2,11 +2,10 @@ module github.com/joro550/dbt-language-server
 
 go 1.22
 
-toolchain go1.22.1
-
 require (
 	github.com/tliron/commonlog v0.2.15
 	github.com/tliron/glsp v0.2.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -28,5 +27,4 @@ require (
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
