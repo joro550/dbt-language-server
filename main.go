@@ -52,6 +52,8 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 	initLog := commonlog.GetLoggerf("%s.init", lsName)
 
 	ROOT_DIR = params.WorkspaceFolders[0].URI
+	initLog.Infof("ROOT_DIR %v", ROOT_DIR)
+
 	settings, err := LoadSettings(ROOT_DIR)
 	if err != nil {
 		initLog.Errorf("ERROR %v", err)

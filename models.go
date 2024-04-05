@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"io/fs"
-	"net/url"
 	"path/filepath"
 
 	"github.com/tliron/commonlog"
@@ -66,8 +65,12 @@ func (m *schemaModel) ToNode() []Node {
 }
 
 func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
-	dbtProjectFile := filepath.Join(workspaceFolder, "dbt_project.yml")
-	fileContent, err := ReadFileUri(dbtProjectFile)
+	cleanedWorkspaceUri, err := CleanUri(workspaceFolder)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+
+	fileContent, err := ReadFileUri2(cleanedWorkspaceUri, "dbt_project.yml")
 	if err != nil {
 		return ProjectSettings{}, err
 	}
@@ -77,17 +80,15 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 	if err != nil {
 		return ProjectSettings{}, err
 	}
-
 	return ProjectSettings{
-		RootPath:     workspaceFolder,
+		RootPath:     cleanedWorkspaceUri,
 		PathSettings: settings,
-		TargetPath:   filepath.Join(workspaceFolder, "target"),
+		TargetPath:   filepath.Join(cleanedWorkspaceUri, "target"),
 	}, nil
 }
 
 func (ps ProjectSettings) GetRootDirectory() string {
-	u, _ := url.ParseRequestURI(ps.RootPath)
-	return u.Path
+	return ps.RootPath
 }
 
 func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
@@ -112,6 +113,8 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 			fileContent, err := ReadFileUri(path)
 			logger.Infof("file : %v", path)
 			if err != nil {
+
+				logger.Infof("Could not read file: %v", err)
 				return err
 			}
 
@@ -120,6 +123,7 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 
 			logger.Infof("file : %v", model)
 			if err != nil {
+				logger.Infof("Could not parse yaml file", err)
 				return err
 			}
 
@@ -135,9 +139,57 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 	return schemaFiles, nil
 }
 
+func (settings ProjectSettings) PredictManifestFile() (Manifest, error) {
+	logger := commonlog.GetLogger("models.PredictManifestFile")
+
+	manifest := Manifest{}
+	for _, path := range settings.PathSettings.ModelPath {
+		modelPath := filepath.Join(settings.GetRootDirectory(), path)
+
+		err := filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
+			if info.IsDir() {
+				return nil
+			}
+
+			extension := filepath.Ext(info.Name())
+
+			logger.Infof("Extension : %v", extension)
+			if extension != `.yaml` && extension != `.yml` {
+				return nil
+			}
+
+			fileContent, err := ReadFileUri(path)
+			logger.Infof("file : %v", path)
+			if err != nil {
+
+				logger.Infof("Could not read file: %v", err)
+				return err
+			}
+
+			model := schemaModel{}
+			err = yaml.Unmarshal(fileContent, &model)
+
+			logger.Infof("file : %v", model)
+			if err != nil {
+				logger.Infof("Could not parse yaml file", err)
+				return err
+			}
+
+			schemaFiles = append(schemaFiles, model.ToNode()...)
+
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return manifest, nil
+}
+
 func (settings ProjectSettings) LoadManifestFile() (Manifest, error) {
 	manifestPath := filepath.Join(settings.TargetPath, "manifest.json")
-	file, err := ReadFileUri(manifestPath)
+	file, err := ReadFileUri2(manifestPath, "manifest.json")
 	if err != nil {
 		return Manifest{}, err
 	}
