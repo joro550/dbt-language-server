@@ -2,20 +2,24 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"path/filepath"
+	"strings"
 
 	"github.com/tliron/commonlog"
 	"gopkg.in/yaml.v3"
 )
 
 type ProjectSettings struct {
+	Name         string
 	RootPath     string
 	TargetPath   string
 	PathSettings pathSettings
 }
 
 type pathSettings struct {
+	Name      string   `yaml:"name"`
 	ModelPath []string `yaml:"model-paths"`
 	MacroPath []string `yaml:"macro-paths"`
 }
@@ -81,6 +85,7 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 		return ProjectSettings{}, err
 	}
 	return ProjectSettings{
+		Name:         settings.Name,
 		RootPath:     cleanedWorkspaceUri,
 		PathSettings: settings,
 		TargetPath:   filepath.Join(cleanedWorkspaceUri, "target"),
@@ -139,49 +144,47 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 	return schemaFiles, nil
 }
 
-func (settings ProjectSettings) PredictManifestFile() (Manifest, error) {
+func (settings ProjectSettings) PredictManifestFile(projectName string) (Manifest, error) {
 	logger := commonlog.GetLogger("models.PredictManifestFile")
 
-	manifest := Manifest{}
+	manifest := Manifest{
+		Nodes:    map[string]Node{},
+		Macros:   map[string]Macro{},
+		Metadata: Metadata{ProjectName: projectName},
+	}
+
 	for _, path := range settings.PathSettings.ModelPath {
 		modelPath := filepath.Join(settings.GetRootDirectory(), path)
 
-		err := filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
+		filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
 			if info.IsDir() {
 				return nil
 			}
 
 			extension := filepath.Ext(info.Name())
-
-			logger.Infof("Extension : %v", extension)
-			if extension != `.yaml` && extension != `.yml` {
+			if extension != `.sql` {
 				return nil
 			}
 
 			fileContent, err := ReadFileUri(path)
 			logger.Infof("file : %v", path)
 			if err != nil {
-
 				logger.Infof("Could not read file: %v", err)
 				return err
 			}
 
-			model := schemaModel{}
-			err = yaml.Unmarshal(fileContent, &model)
-
-			logger.Infof("file : %v", model)
-			if err != nil {
-				logger.Infof("Could not parse yaml file", err)
-				return err
+			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
+			node := Node{
+				Name:    fileName,
+				RawCode: string(fileContent),
+				Columns: map[string]NodeColumn{},
 			}
 
-			schemaFiles = append(schemaFiles, model.ToNode()...)
+			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
+			manifest.Nodes[key] = node
 
 			return nil
 		})
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return manifest, nil
