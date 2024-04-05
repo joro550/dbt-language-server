@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/tliron/commonlog"
@@ -96,9 +97,10 @@ func (ps ProjectSettings) GetRootDirectory() string {
 	return ps.RootPath
 }
 
-func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
+func (settings ProjectSettings) GetSchemaFiles() (map[string]Node, error) {
 	logger := commonlog.GetLoggerf("%s.schema", "settings")
-	schemaFiles := []Node{}
+	schemaFiles := map[string]Node{}
+	yamlRegex := regexp.MustCompile(`\.yml|\.yaml`)
 
 	for _, path := range settings.PathSettings.ModelPath {
 		modelPath := filepath.Join(settings.GetRootDirectory(), path)
@@ -109,9 +111,7 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 			}
 
 			extension := filepath.Ext(info.Name())
-
-			logger.Infof("Extension : %v", extension)
-			if extension != `.yaml` && extension != `.yml` {
+			if yamlRegex.MatchString(extension) {
 				return nil
 			}
 
@@ -132,7 +132,9 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 				return err
 			}
 
-			schemaFiles = append(schemaFiles, model.ToNode()...)
+			for _, node := range model.ToNode() {
+				schemaFiles[node.Name] = node
+			}
 
 			return nil
 		})
@@ -144,8 +146,9 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 	return schemaFiles, nil
 }
 
-func (settings ProjectSettings) PredictManifestFile(projectName string) (Manifest, error) {
+func (settings ProjectSettings) PredictManifestFile(projectName string, schemas map[string]Node) (Manifest, error) {
 	logger := commonlog.GetLogger("models.PredictManifestFile")
+	parser := NewJinjaParser()
 
 	manifest := Manifest{
 		Nodes:    map[string]Node{},
@@ -167,22 +170,40 @@ func (settings ProjectSettings) PredictManifestFile(projectName string) (Manifes
 			}
 
 			fileContent, err := ReadFileUri(path)
-			logger.Infof("file : %v", path)
 			if err != nil {
 				logger.Infof("Could not read file: %v", err)
 				return err
 			}
 
 			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
-			node := Node{
-				Name:    fileName,
-				RawCode: string(fileContent),
-				Columns: map[string]NodeColumn{},
-			}
 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
-			manifest.Nodes[key] = node
+			schema, schemaExists := schemas[fileName]
 
+			var node Node
+			if schemaExists {
+				node = schema
+			} else {
+				node = Node{
+					Name:    fileName,
+					RawCode: string(fileContent),
+					Columns: map[string]NodeColumn{},
+				}
+			}
+
+			fileString := string(fileContent)
+
+			if !parser.HasJinjaBlocks(fileString) {
+				manifest.Nodes[key] = node
+				return nil
+			}
+
+			for _, ref := range parser.GetAllRefTags(fileString) {
+				key := fmt.Sprintf("model.%v.%v", projectName, ref.ModelName)
+				node.Depends.Nodes = append(node.Depends.Nodes, key)
+			}
+
+			manifest.Nodes[key] = node
 			return nil
 		})
 	}

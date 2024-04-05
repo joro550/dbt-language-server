@@ -72,7 +72,7 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 		initLog.Errorf("could not load manifest file %v", err)
 	}
 
-	manifest, err = settings.PredictManifestFile(settings.Name)
+	manifest, err = settings.PredictManifestFile(settings.Name, schemas)
 	if err != nil {
 		initLog.Errorf("Could not predict manifest file %v", err)
 		return nil, err
