@@ -111,7 +111,7 @@ func (settings ProjectSettings) GetSchemaFiles() (map[string]Node, error) {
 			}
 
 			extension := filepath.Ext(info.Name())
-			if yamlRegex.MatchString(extension) {
+			if !yamlRegex.MatchString(extension) {
 				return nil
 			}
 
@@ -128,7 +128,7 @@ func (settings ProjectSettings) GetSchemaFiles() (map[string]Node, error) {
 
 			logger.Infof("file : %v", model)
 			if err != nil {
-				logger.Infof("Could not parse yaml file", err)
+				logger.Infof("Could not parse yaml file %v , file : %v", err, path)
 				return err
 			}
 
@@ -169,15 +169,18 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 				return nil
 			}
 
+			logger.Infof("trying to read file: %v", path)
 			fileContent, err := ReadFileUri(path)
 			if err != nil {
-				logger.Infof("Could not read file: %v", err)
+				logger.Infof("Could not read file: %v, path: %v", err, path)
 				return err
 			}
 
 			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
+
+			logger.Infof("adding key: %s", key)
 			schema, schemaExists := schemas[fileName]
 
 			var node Node

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/tliron/commonlog"
 )
 
 func getModelNameFromFilePath(filePath string) string {
@@ -37,12 +39,21 @@ func positionWithinRange(rawPosition int, ranges []Range) bool {
 }
 
 func ReadFileUri(fileUri string) ([]byte, error) {
-	u, _ := CleanUri(fileUri)
+	logger := commonlog.GetLogger("utils.ReadFileUri")
+	logger.Infof("fileUri: %s", fileUri)
+	u, err := CleanUri(fileUri)
+	logger.Infof("cleaned uri: %s", u)
+	if err != nil {
+		return nil, err
+	}
 	return os.ReadFile(u)
 }
 
 func ReadFileUri2(path, file string) ([]byte, error) {
-	u, _ := CleanUri(path)
+	u, err := CleanUri(path)
+	if err != nil {
+		return nil, err
+	}
 	return os.ReadFile(filepath.Join(u, file))
 }
 
@@ -52,7 +63,7 @@ func CleanUri(fileUri string) (string, error) {
 
 	var cleanedPath string
 	// This is probably because this is not a uri
-	if err != nil {
+	if err != nil || cleanedUri.Path == "" {
 		cleanedPath = fileUri
 	} else {
 		cleanedPath = cleanedUri.Path
@@ -64,6 +75,5 @@ func CleanUri(fileUri string) (string, error) {
 			cleanedPath = cleanedPath[1:]
 		}
 	}
-
 	return cleanedPath, nil
 }
