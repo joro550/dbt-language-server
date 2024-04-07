@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -119,8 +120,11 @@ func highlighHandler(_ *glsp.Context, _ *protocol.DocumentHighlightParams) ([]pr
 
 func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams) (any, error) {
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
+	definitionLog.Infof("getting definition: %v", params.TextDocument.URI)
 
 	file := getModelNameFromFilePath(params.TextDocument.URI)
+
+	definitionLog.Infof("file %v", file)
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
 
 	val, ok := manifest.Nodes[key]
@@ -140,8 +144,15 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 		return nil, err
 	}
 
+	location, err := url.JoinPath(ROOT_DIR, model.FileName)
+	if err != nil {
+		definitionLog.Infof("join path failed: %v", err)
+	}
+
+	definitionLog.Infof("returning location %v", location)
+
 	return protocol.Location{
-		URI: filepath.Join(ROOT_DIR, model.FileName),
+		URI: location,
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 0},
