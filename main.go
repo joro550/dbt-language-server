@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -52,6 +53,8 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 	initLog := commonlog.GetLoggerf("%s.init", lsName)
 
 	ROOT_DIR = params.WorkspaceFolders[0].URI
+	initLog.Infof("ROOT_DIR %v", ROOT_DIR)
+
 	settings, err := LoadSettings(ROOT_DIR)
 	if err != nil {
 		initLog.Errorf("ERROR %v", err)
@@ -62,12 +65,17 @@ func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, 
 	if err != nil {
 		initLog.Errorf("Could not load schema files %v", err)
 	} else {
-		initLog.Infof("Loaded Schema file %v", schemas)
+		initLog.Infof("Loaded schema files %v", schemas)
 	}
 
 	manifest, err = settings.LoadManifestFile()
 	if err != nil {
 		initLog.Errorf("could not load manifest file %v", err)
+	}
+
+	manifest, err = settings.PredictManifestFile(settings.Name, schemas)
+	if err != nil {
+		initLog.Errorf("Could not predict manifest file %v", err)
 		return nil, err
 	}
 
@@ -112,8 +120,11 @@ func highlighHandler(_ *glsp.Context, _ *protocol.DocumentHighlightParams) ([]pr
 
 func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams) (any, error) {
 	definitionLog := commonlog.GetLoggerf("%s.definition", lsName)
+	definitionLog.Infof("getting definition: %v", params.TextDocument.URI)
 
 	file := getModelNameFromFilePath(params.TextDocument.URI)
+
+	definitionLog.Infof("file %v", file)
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
 
 	val, ok := manifest.Nodes[key]
@@ -133,8 +144,15 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 		return nil, err
 	}
 
+	location, err := url.JoinPath(ROOT_DIR, model.FileName)
+	if err != nil {
+		definitionLog.Infof("join path failed: %v", err)
+	}
+
+	definitionLog.Infof("returning location %v", location)
+
 	return protocol.Location{
-		URI: filepath.Join(ROOT_DIR, model.FileName),
+		URI: location,
 		Range: protocol.Range{
 			Start: protocol.Position{Line: 0, Character: 0},
 			End:   protocol.Position{Line: 0, Character: 0},

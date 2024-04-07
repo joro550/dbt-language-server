@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-)
 
-var fileRegex = regexp.MustCompile(`file:`)
+	"github.com/tliron/commonlog"
+)
 
 func getModelNameFromFilePath(filePath string) string {
 	file := filepath.Base(filePath)
@@ -39,6 +39,41 @@ func positionWithinRange(rawPosition int, ranges []Range) bool {
 }
 
 func ReadFileUri(fileUri string) ([]byte, error) {
-	u, _ := url.ParseRequestURI(fileUri)
-	return os.ReadFile(u.Path)
+	logger := commonlog.GetLogger("utils.ReadFileUri")
+	logger.Infof("fileUri: %s", fileUri)
+	u, err := CleanUri(fileUri)
+	logger.Infof("cleaned uri: %s", u)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(u)
+}
+
+func ReadFileUri2(path, file string) ([]byte, error) {
+	u, err := CleanUri(path)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(filepath.Join(u, file))
+}
+
+func CleanUri(fileUri string) (string, error) {
+	driveRegex := regexp.MustCompile(`[a-zA-Z]:\/\/`)
+	cleanedUri, err := url.ParseRequestURI(fileUri)
+
+	var cleanedPath string
+	// This is probably because this is not a uri
+	if err != nil || cleanedUri.Path == "" {
+		cleanedPath = fileUri
+	} else {
+		cleanedPath = cleanedUri.Path
+	}
+
+	// this is basically a "are we in windows" check
+	if driveRegex.MatchString(fileUri) {
+		if cleanedPath[0] == '/' || cleanedPath[0] == '\\' {
+			cleanedPath = cleanedPath[1:]
+		}
+	}
+	return cleanedPath, nil
 }

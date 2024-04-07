@@ -2,21 +2,25 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
-	"net/url"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/tliron/commonlog"
 	"gopkg.in/yaml.v3"
 )
 
 type ProjectSettings struct {
+	Name         string
 	RootPath     string
 	TargetPath   string
 	PathSettings pathSettings
 }
 
 type pathSettings struct {
+	Name      string   `yaml:"name"`
 	ModelPath []string `yaml:"model-paths"`
 	MacroPath []string `yaml:"macro-paths"`
 }
@@ -66,8 +70,12 @@ func (m *schemaModel) ToNode() []Node {
 }
 
 func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
-	dbtProjectFile := filepath.Join(workspaceFolder, "dbt_project.yml")
-	fileContent, err := ReadFileUri(dbtProjectFile)
+	cleanedWorkspaceUri, err := CleanUri(workspaceFolder)
+	if err != nil {
+		return ProjectSettings{}, err
+	}
+
+	fileContent, err := ReadFileUri2(cleanedWorkspaceUri, "dbt_project.yml")
 	if err != nil {
 		return ProjectSettings{}, err
 	}
@@ -77,22 +85,22 @@ func LoadSettings(workspaceFolder string) (ProjectSettings, error) {
 	if err != nil {
 		return ProjectSettings{}, err
 	}
-
 	return ProjectSettings{
-		RootPath:     workspaceFolder,
+		Name:         settings.Name,
+		RootPath:     cleanedWorkspaceUri,
 		PathSettings: settings,
-		TargetPath:   filepath.Join(workspaceFolder, "target"),
+		TargetPath:   filepath.Join(cleanedWorkspaceUri, "target"),
 	}, nil
 }
 
 func (ps ProjectSettings) GetRootDirectory() string {
-	u, _ := url.ParseRequestURI(ps.RootPath)
-	return u.Path
+	return ps.RootPath
 }
 
-func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
+func (settings ProjectSettings) GetSchemaFiles() (map[string]Node, error) {
 	logger := commonlog.GetLoggerf("%s.schema", "settings")
-	schemaFiles := []Node{}
+	schemaFiles := map[string]Node{}
+	yamlRegex := regexp.MustCompile(`\.yml|\.yaml`)
 
 	for _, path := range settings.PathSettings.ModelPath {
 		modelPath := filepath.Join(settings.GetRootDirectory(), path)
@@ -103,15 +111,15 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 			}
 
 			extension := filepath.Ext(info.Name())
-
-			logger.Infof("Extension : %v", extension)
-			if extension != `.yaml` && extension != `.yml` {
+			if !yamlRegex.MatchString(extension) {
 				return nil
 			}
 
 			fileContent, err := ReadFileUri(path)
 			logger.Infof("file : %v", path)
 			if err != nil {
+
+				logger.Infof("Could not read file: %v", err)
 				return err
 			}
 
@@ -120,10 +128,13 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 
 			logger.Infof("file : %v", model)
 			if err != nil {
+				logger.Infof("Could not parse yaml file %v , file : %v", err, path)
 				return err
 			}
 
-			schemaFiles = append(schemaFiles, model.ToNode()...)
+			for _, node := range model.ToNode() {
+				schemaFiles[node.Name] = node
+			}
 
 			return nil
 		})
@@ -135,9 +146,77 @@ func (settings ProjectSettings) GetSchemaFiles() ([]Node, error) {
 	return schemaFiles, nil
 }
 
+func (settings ProjectSettings) PredictManifestFile(projectName string, schemas map[string]Node) (Manifest, error) {
+	logger := commonlog.GetLogger("models.PredictManifestFile")
+	parser := NewJinjaParser()
+
+	manifest := Manifest{
+		Nodes:    map[string]Node{},
+		Macros:   map[string]Macro{},
+		Metadata: Metadata{ProjectName: projectName},
+	}
+
+	for _, path := range settings.PathSettings.ModelPath {
+		modelPath := filepath.Join(settings.GetRootDirectory(), path)
+
+		filepath.Walk(modelPath, func(path string, info fs.FileInfo, error error) error {
+			if info.IsDir() {
+				return nil
+			}
+
+			extension := filepath.Ext(info.Name())
+			if extension != `.sql` {
+				return nil
+			}
+
+			logger.Infof("trying to read file: %v", path)
+			fileContent, err := ReadFileUri(path)
+			if err != nil {
+				logger.Infof("Could not read file: %v, path: %v", err, path)
+				return err
+			}
+
+			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
+
+			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
+
+			logger.Infof("adding key: %s", key)
+			schema, schemaExists := schemas[fileName]
+
+			var node Node
+			if schemaExists {
+				node = schema
+			} else {
+				node = Node{
+					Name:    fileName,
+					RawCode: string(fileContent),
+					Columns: map[string]NodeColumn{},
+				}
+			}
+
+			fileString := string(fileContent)
+
+			if !parser.HasJinjaBlocks(fileString) {
+				manifest.Nodes[key] = node
+				return nil
+			}
+
+			for _, ref := range parser.GetAllRefTags(fileString) {
+				key := fmt.Sprintf("model.%v.%v", projectName, ref.ModelName)
+				node.Depends.Nodes = append(node.Depends.Nodes, key)
+			}
+
+			manifest.Nodes[key] = node
+			return nil
+		})
+	}
+
+	return manifest, nil
+}
+
 func (settings ProjectSettings) LoadManifestFile() (Manifest, error) {
 	manifestPath := filepath.Join(settings.TargetPath, "manifest.json")
-	file, err := ReadFileUri(manifestPath)
+	file, err := ReadFileUri2(manifestPath, "manifest.json")
 	if err != nil {
 		return Manifest{}, err
 	}

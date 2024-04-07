@@ -3,8 +3,8 @@ module github.com/joro550/dbt-language-server
 go 1.22
 
 require (
-	github.com/tliron/commonlog v0.2.15
-	github.com/tliron/glsp v0.2.1
+	github.com/tliron/commonlog v0.2.13
+	github.com/tliron/glsp v0.2.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 

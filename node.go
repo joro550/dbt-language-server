@@ -58,7 +58,6 @@ func (n Node) GetDefinition(params DefinitionRequest) (DefinitionResponse, error
 
 	fileContent, err := ReadFileUri(params.FileUri)
 	if err != nil {
-
 		logger.Infof("couldn't read file %v", err)
 		return DefinitionResponse{}, err
 	}
@@ -71,7 +70,11 @@ func (n Node) GetDefinition(params DefinitionRequest) (DefinitionResponse, error
 		// Are we in a jinja block ?
 		if positionWithinRange(rawPosition, positions) {
 			return n.getJinjaDefinition(params, rawPosition, fileString, parser)
+		} else {
+			logger.Info("Not in a jinja block")
 		}
+	} else {
+		logger.Info("No jinja block found")
 	}
 
 	// handle sql definition
@@ -93,6 +96,7 @@ func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, cont
 			return DefinitionResponse{FileName: node.OriginalPath}, nil
 		}
 	}
+	logger.Info("not within ref tag")
 
 	macros := parser.GetMacros(content)
 	logger.Infof("could not find a ref tag trying macro %v", macros)
@@ -106,6 +110,8 @@ func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, cont
 			return DefinitionResponse{FileName: node.OriginalPath}, nil
 		}
 	}
+
+	logger.Info("not withing macro")
 
 	return DefinitionResponse{}, nil
 }
