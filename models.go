@@ -184,12 +184,11 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			if schemaExists {
 				node = schema
 			} else {
-				originalPath := fmt.Sprintf("file://", path)
 				node = Node{
 					Name:         fileName,
 					RawCode:      string(fileContent),
 					Columns:      map[string]NodeColumn{},
-					OriginalPath: originalPath,
+					OriginalPath: fmt.Sprintf("file://", path),
 				}
 			}
 
@@ -206,6 +205,42 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			}
 
 			manifest.Nodes[key] = node
+			return nil
+		})
+	}
+
+	for _, path := range settings.PathSettings.MacroPath {
+		macroPath := filepath.Join(settings.GetRootDirectory(), path)
+
+		filepath.Walk(macroPath, func(path string, info fs.FileInfo, error error) error {
+			if info.IsDir() {
+				return nil
+			}
+
+			extension := filepath.Ext(info.Name())
+			if extension != `.sql` {
+				return nil
+			}
+
+			fileContent, err := ReadFileUri(path)
+			if err != nil {
+				logger.Infof("Could not read file: %v, path: %v", err, path)
+				return err
+			}
+
+			fileString := string(fileContent)
+			if !parser.HasJinjaBlocks(fileString) {
+				return nil
+			}
+
+			for _, macro := range parser.GetMacroDefinitions(fileString) {
+				key := fmt.Sprintf("macro.%v.%v", projectName, macro.ModelName)
+				manifest.Macros[key] = Macro{
+					OriginalPath: fmt.Sprintf("file://", path),
+					Name:         macro.ModelName,
+				}
+			}
+
 			return nil
 		})
 	}

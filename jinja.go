@@ -7,12 +7,13 @@ import (
 )
 
 type JinjaParser struct {
-	expressionPattern     *regexp.Regexp
-	statementPattern      *regexp.Regexp
-	commentPattern        *regexp.Regexp
-	refPattern            *regexp.Regexp
-	macroPattern          *regexp.Regexp
-	effectiveJinjaPattern *regexp.Regexp
+	expressionPattern      *regexp.Regexp
+	statementPattern       *regexp.Regexp
+	commentPattern         *regexp.Regexp
+	refPattern             *regexp.Regexp
+	macroPattern           *regexp.Regexp
+	effectiveJinjaPattern  *regexp.Regexp
+	macroDefinitionPattern *regexp.Regexp
 }
 
 func NewJinjaParser() JinjaParser {
@@ -21,15 +22,17 @@ func NewJinjaParser() JinjaParser {
 	commentPattern := regexp.MustCompile(`{#[\s\S]*?#}`)
 	effectiveJinjaPattern := regexp.MustCompile(`{{[\s\S]*?}}|{%[\s\S]*?%}`)
 	refPattern := regexp.MustCompile(`{{\s*ref\s*\(\s*['|"](?<project>[a-z_]*?)\s*['|"]\s*(,?\s*['|"](?<model>[a-z_]*?)\s*['|"])?\)\s*}}`)
-	macroPattern := regexp.MustCompile(`{{\s*(?<function_name>[a-zA-Z_]*)\s*\([\sA-Za-z='_0-9"]*\)\s*}}`)
+	macroPattern := regexp.MustCompile(`{{\s*(?<function_name>[a-zA-Z_]*)\s*\([\sA-Za-z=,'_0-9"]*\)\s*}}`)
+	macroDefition := regexp.MustCompile(`{%-?\s*macro\s*(?<function_name>[a-zA-Z_]*)\s*\([\sA-Za-z=,'_0-9"]*\)\s*-?%}`)
 
 	return JinjaParser{
-		expressionPattern:     expressionPattern,
-		statementPattern:      statementPattern,
-		commentPattern:        commentPattern,
-		refPattern:            refPattern,
-		macroPattern:          macroPattern,
-		effectiveJinjaPattern: effectiveJinjaPattern,
+		expressionPattern:      expressionPattern,
+		statementPattern:       statementPattern,
+		commentPattern:         commentPattern,
+		refPattern:             refPattern,
+		macroPattern:           macroPattern,
+		effectiveJinjaPattern:  effectiveJinjaPattern,
+		macroDefinitionPattern: macroDefition,
 	}
 }
 
@@ -95,6 +98,39 @@ func (jp JinjaParser) GetMacros(content string) []MacroReference {
 	macroNames := []MacroReference{}
 	functionIndex := jp.macroPattern.SubexpIndex("function_name")
 	matches := jp.macroPattern.FindAllStringSubmatch(content, -1)
+
+	for i, match := range matches {
+
+		functionName := match[functionIndex]
+		if functionName == "" || slices.Contains(keywords, functionName) {
+			continue
+		}
+
+		macroNames = append(macroNames, MacroReference{
+			ModelName: functionName,
+			Range: Range{
+				Start: resultIndicies[i][0],
+				End:   resultIndicies[i][1],
+			},
+		})
+
+	}
+
+	return macroNames
+}
+
+func (jp JinjaParser) GetMacroDefinitions(content string) []MacroReference {
+	keywords := []string{"ref", "config"}
+	byteContent := []byte(content)
+	resultIndicies := jp.macroDefinitionPattern.FindAllIndex(byteContent, -1)
+
+	if resultIndicies == nil {
+		return []MacroReference{}
+	}
+
+	macroNames := []MacroReference{}
+	functionIndex := jp.macroDefinitionPattern.SubexpIndex("function_name")
+	matches := jp.macroDefinitionPattern.FindAllStringSubmatch(content, -1)
 
 	for i, match := range matches {
 
