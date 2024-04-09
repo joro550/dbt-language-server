@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,8 +21,7 @@ func getRawPositionInFile(content string, line, character uint32) int {
 	position := 0
 	fileLines := strings.Split(content, "\n")
 	for i := uint32(0); i < line; i++ {
-		position += len(fileLines[i])
-		fmt.Println("line", i)
+		position += len(fileLines[i]) + 1
 	}
 	position += int(character)
 	return position

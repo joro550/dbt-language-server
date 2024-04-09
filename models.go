@@ -169,7 +169,6 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 				return nil
 			}
 
-			logger.Infof("trying to read file: %v", path)
 			fileContent, err := ReadFileUri(path)
 			if err != nil {
 				logger.Infof("Could not read file: %v, path: %v", err, path)
@@ -179,18 +178,18 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
-
-			logger.Infof("adding key: %s", key)
 			schema, schemaExists := schemas[fileName]
 
 			var node Node
 			if schemaExists {
 				node = schema
 			} else {
+				originalPath := fmt.Sprintf("file://", path)
 				node = Node{
-					Name:    fileName,
-					RawCode: string(fileContent),
-					Columns: map[string]NodeColumn{},
+					Name:         fileName,
+					RawCode:      string(fileContent),
+					Columns:      map[string]NodeColumn{},
+					OriginalPath: originalPath,
 				}
 			}
 
