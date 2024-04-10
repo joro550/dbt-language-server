@@ -41,8 +41,7 @@ func (jp JinjaParser) HasJinjaBlocks(content string) bool {
 }
 
 func (jp JinjaParser) GetJinjaPositions(content string) []Range {
-	byteContent := []byte(content)
-	resultIndicies := jp.effectiveJinjaPattern.FindAllIndex(byteContent, -1)
+	resultIndicies := jp.effectiveJinjaPattern.FindAllStringIndex(content, -1)
 
 	if resultIndicies == nil {
 		return []Range{}
@@ -56,8 +55,7 @@ func (jp JinjaParser) GetJinjaPositions(content string) []Range {
 }
 
 func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
-	byteContent := []byte(content)
-	resultIndicies := jp.refPattern.FindAllIndex(byteContent, -1)
+	resultIndicies := jp.refPattern.FindAllStringIndex(content, -1)
 
 	if resultIndicies == nil {
 		return []ModelReference{}
@@ -68,6 +66,7 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 	matches := jp.refPattern.FindAllStringSubmatch(content, -1)
 
 	references := []ModelReference{}
+
 	for i, index := range resultIndicies {
 
 		modelName := ""
@@ -88,8 +87,7 @@ func (jp JinjaParser) GetAllRefTags(content string) []ModelReference {
 
 func (jp JinjaParser) GetMacros(content string) []MacroReference {
 	keywords := []string{"ref", "config"}
-	byteContent := []byte(content)
-	resultIndicies := jp.macroPattern.FindAllIndex(byteContent, -1)
+	resultIndicies := jp.macroPattern.FindAllStringIndex(content, -1)
 
 	if resultIndicies == nil {
 		return []MacroReference{}
@@ -121,8 +119,7 @@ func (jp JinjaParser) GetMacros(content string) []MacroReference {
 
 func (jp JinjaParser) GetMacroDefinitions(content string) []MacroReference {
 	keywords := []string{"ref", "config"}
-	byteContent := []byte(content)
-	resultIndicies := jp.macroDefinitionPattern.FindAllIndex(byteContent, -1)
+	resultIndicies := jp.macroDefinitionPattern.FindAllStringIndex(content, -1)
 
 	if resultIndicies == nil {
 		return []MacroReference{}
