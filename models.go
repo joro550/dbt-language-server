@@ -188,7 +188,7 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 					Name:         fileName,
 					RawCode:      string(fileContent),
 					Columns:      map[string]NodeColumn{},
-					OriginalPath: fmt.Sprintf("file://", path),
+					OriginalPath: fmt.Sprintf("file://%v", path),
 				}
 			}
 
@@ -236,7 +236,7 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			for _, macro := range parser.GetMacroDefinitions(fileString) {
 				key := fmt.Sprintf("macro.%v.%v", projectName, macro.ModelName)
 				manifest.Macros[key] = Macro{
-					OriginalPath: fmt.Sprintf("file://", path),
+					OriginalPath: fmt.Sprintf("file://%v", path),
 					Name:         macro.ModelName,
 				}
 			}
