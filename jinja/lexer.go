@@ -68,17 +68,42 @@ func (s *Scanner) unread() { _ = s.r.UnreadRune() }
 func (s *Scanner) ScanAll() []Token {
 	tokens := []Token{}
 
-	for token, value := s.scan(); token != EOF; token, value = s.scan() {
+	token, value := s.scan(false)
+	withinJinja := false
+	for token != EOF {
+
+		switch token {
+		case START_EXPRESSION, START_STATEMENT, START_COMMENT:
+			withinJinja = true
+		case END_EXPRESSION, END_STATEMENT, END_COMMENT:
+			withinJinja = false
+		}
+
 		tokens = append(tokens, Token{Value: value, Token: token})
+		token, value = s.scan(withinJinja)
 	}
 
 	return tokens
 }
 
-func (s *Scanner) scan() (TOKEN, string) {
+func (s *Scanner) scan(withinJinja bool) (TOKEN, string) {
 	ch := s.read()
 
-	if isWhitespace(ch) {
+	// if we are not within a jinja template, we can only scan text
+	if !withinJinja {
+		if ch == eof {
+			return EOF, ""
+		} else if isWhitespace(ch) {
+			s.unread()
+			return s.scanWhitespace()
+		} else {
+			s.scanText()
+		}
+	}
+
+	if ch == eof {
+		return EOF, ""
+	} else if isWhitespace(ch) {
 		s.unread()
 		return s.scanWhitespace()
 	} else if isLetter(ch) {
@@ -88,6 +113,7 @@ func (s *Scanner) scan() (TOKEN, string) {
 		s.unread()
 		return s.scanNumber()
 	} else if isJinjaIdentifier(ch) {
+		s.unread()
 		s.scanJinjaTemplate()
 	}
 
@@ -139,6 +165,28 @@ func (s *Scanner) scanIdent() (tok TOKEN, lit string) {
 }
 
 // scanIdent consumes the current rune and all contiguous ident runes.
+func (s *Scanner) scanText() (tok TOKEN, lit string) {
+	// Create a buffer and read the current character into it.
+	var buf bytes.Buffer
+	buf.WriteRune(s.read())
+
+	// Read every subsequent ident character into the buffer.
+	// Non-ident characters and EOF will cause the loop to exit.
+	for {
+		if ch := s.read(); ch == eof {
+			break
+		} else if isWhitespace(ch) {
+			s.unread()
+			break
+		} else {
+			_, _ = buf.WriteRune(ch)
+		}
+	}
+
+	return TEXT, buf.String()
+}
+
+// scanIdent consumes the current rune and all contiguous ident runes.
 func (s *Scanner) scanNumber() (tok TOKEN, lit string) {
 	// Create a buffer and read the current character into it.
 	var buf bytes.Buffer
@@ -178,8 +226,8 @@ func (s *Scanner) scanJinjaTemplate() (tok TOKEN, lit string) {
 			_, _ = buf.WriteRune(ch)
 		}
 	}
-	stringVal := buf.String()
 
+	stringVal := buf.String()
 	switch stringVal {
 	case "{{":
 		return START_EXPRESSION, stringVal
@@ -191,18 +239,18 @@ func (s *Scanner) scanJinjaTemplate() (tok TOKEN, lit string) {
 	case "%}":
 		return END_STATEMENT, stringVal
 
-
 	case "{#":
 		return START_COMMENT, stringVal
 	case "#}":
-		return END_COMMENT
+		return END_COMMENT, stringVal
 	}
 
+	s.unread()
 	return ILLEGAL, stringVal
 }
 
 func isWhitespace(ch rune) bool {
-	return ch == '' || ch == '\t' || ch == '\n'
+	return ch == ' ' || ch == '\r' || ch == '\n'
 }
 
 func isLetter(ch rune) bool {
