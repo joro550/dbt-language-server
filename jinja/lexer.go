@@ -1,28 +1,42 @@
 package jinja
 
-import (
-	"bufio"
-	"bytes"
-	"io"
-)
-
-type TOKEN int
+type TokenType int
 
 type Token struct {
 	Value string
-	Token TOKEN
+	Token TokenType
 }
 
 var eof = rune(0)
 
+var keywords = map[string]TokenType{
+	"set":      SET,
+	"for":      FOR,
+	"in":       IN,
+	"macro":    MACRO,
+	"endmacro": END_MACRO,
+	"if":       IF,
+}
+
 const (
-	LEFT_BRACE TOKEN = iota
+	LEFT_BRACE TokenType = iota
 	RIGHT_BRACE
 	PERCENT
 	IDENT
+	INT
 	PIPE
 	LEFT_BRACKET
 	RIGHT_BRACKET
+	ASSIGN
+	PLUS
+	MINUS
+	SLASH
+	ASTERIKS
+	LT
+	GT
+	COMMA
+	BANG
+	SEMI_COLON
 
 	START_EXPRESSION
 	START_STATEMENT
@@ -32,7 +46,12 @@ const (
 	END_STATEMENT
 	END_COMMENT
 
-	NUMBER
+	SET
+	FOR
+	IN
+	MACRO
+	END_MACRO
+	IF
 
 	ILLEGAL
 	WS
@@ -42,225 +61,122 @@ const (
 	EOF
 )
 
-// Scanner represents a lexical scanner.
-type Scanner struct {
-	r *bufio.Reader
+type Lexer struct {
+	input        string
+	position     int
+	readPosition int
+	ch           byte
 }
 
-// NewScanner returns a new instance of Scanner.
-func NewScanner(r io.Reader) *Scanner {
-	return &Scanner{r: bufio.NewReader(r)}
+func NewJinjaLexer(input string) *Lexer {
+	l := &Lexer{input: input}
+	l.readChar()
+	return l
 }
 
-// read reads the next rune from the bufferred reader.
-// Returns the rune(0) if an error occurs (or io.EOF is returned).
-func (s *Scanner) read() rune {
-	ch, _, err := s.r.ReadRune()
-	if err != nil {
-		return eof
+func (l *Lexer) readChar() {
+	if l.readPosition >= len(l.input) {
+		l.ch = 0
+	} else {
+		l.ch = l.input[l.readPosition]
 	}
-	return ch
+
+	l.position = l.readPosition
+	l.readPosition += 1
 }
 
-// unread places the previously read rune back on the reader.
-func (s *Scanner) unread() { _ = s.r.UnreadRune() }
+func (l *Lexer) peekChar() {
+	if l.readPosition >= len(l.input) {
+		l.ch = 0
+	} else {
+		l.ch = l.input[l.readPosition]
+	}
+}
 
-func (s *Scanner) ScanAll() []Token {
-	tokens := []Token{}
+func (l *Lexer) NextToken() Token {
+	var tok Token
 
-	token, value := s.scan(false)
-	withinJinja := false
-	for token != EOF {
+	l.skipWhitespace()
 
-		switch token {
-		case START_EXPRESSION, START_STATEMENT, START_COMMENT:
-			withinJinja = true
-		case END_EXPRESSION, END_STATEMENT, END_COMMENT:
-			withinJinja = false
+	switch l.ch {
+	case '=':
+		tok = newToken(ASSIGN, l.ch)
+	case '(':
+		tok = newToken(LEFT_BRACKET, l.ch)
+	case ')':
+		tok = newToken(RIGHT_BRACKET, l.ch)
+	case '+':
+		tok = newToken(PLUS, l.ch)
+	case '-':
+		tok = newToken(MINUS, l.ch)
+	case '/':
+		tok = newToken(SLASH, l.ch)
+	case '!':
+		tok = newToken(BANG, l.ch)
+	case '<':
+		tok = newToken(LT, l.ch)
+	case '>':
+		tok = newToken(GT, l.ch)
+	case ',':
+		tok = newToken(COMMA, l.ch)
+	case ';':
+		tok = newToken(SEMI_COLON, l.ch)
+	case 0:
+		tok.Token = EOF
+		tok.Value = ""
+	default:
+		if isLetter(l.ch) {
+			tok.Value = l.readIdentifier()
+			tok.Token = LookupIdent(tok.Value)
+			return tok
+		} else if isDigit(l.ch) {
+			tok.Value = l.readIdentifier()
+			tok.Token = INT
+			return tok
 		}
 
-		tokens = append(tokens, Token{Value: value, Token: token})
-		token, value = s.scan(withinJinja)
 	}
-
-	return tokens
+	l.readChar()
+	return tok
 }
 
-func (s *Scanner) scan(withinJinja bool) (TOKEN, string) {
-	ch := s.read()
-
-	// if we are not within a jinja template, we can only scan text
-	if !withinJinja {
-		if ch == eof {
-			return EOF, ""
-		} else if isWhitespace(ch) {
-			s.unread()
-			return s.scanWhitespace()
-		} else {
-			s.scanText()
-		}
+func (l *Lexer) skipWhitespace() {
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+		l.readChar()
 	}
+}
 
-	if ch == eof {
-		return EOF, ""
-	} else if isWhitespace(ch) {
-		s.unread()
-		return s.scanWhitespace()
-	} else if isLetter(ch) {
-		s.unread()
-		return s.scanIdent()
-	} else if isDigit(ch) {
-		s.unread()
-		return s.scanNumber()
-	} else if isJinjaIdentifier(ch) {
-		s.unread()
-		s.scanJinjaTemplate()
+func LookupIdent(ident string) TokenType {
+	if tok, ok := keywords[ident]; ok {
+		return tok
 	}
-
-	return ILLEGAL, ""
+	return IDENT
 }
 
-func (s *Scanner) scanWhitespace() (tok TOKEN, lit string) {
-	// Create a buffer and read the current character into it.
-	var buf bytes.Buffer
-
-	buf.WriteRune(s.read())
-
-	// Read every subsequent whitespace character into the buffer.
-	// Non-whitespace characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if !isWhitespace(ch) {
-			s.unread()
-			break
-		} else {
-			buf.WriteRune(ch)
-		}
+func (l *Lexer) readIdentifier() string {
+	position := l.position
+	for isLetter(l.ch) {
+		l.readChar()
 	}
-
-	return WS, buf.String()
+	return l.input[position:l.position]
 }
 
-// scanIdent consumes the current rune and all contiguous ident runes.
-func (s *Scanner) scanIdent() (tok TOKEN, lit string) {
-	// Create a buffer and read the current character into it.
-	var buf bytes.Buffer
-	buf.WriteRune(s.read())
-
-	// Read every subsequent ident character into the buffer.
-	// Non-ident characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if !isLetter(ch) && !isDigit(ch) && ch != '_' {
-			s.unread()
-			break
-		} else {
-			_, _ = buf.WriteRune(ch)
-		}
+func (l *Lexer) readNumber() string {
+	position := l.position
+	for isDigit(l.ch) {
+		l.readChar()
 	}
-
-	return IDENT, buf.String()
+	return l.input[position:l.position]
 }
 
-// scanIdent consumes the current rune and all contiguous ident runes.
-func (s *Scanner) scanText() (tok TOKEN, lit string) {
-	// Create a buffer and read the current character into it.
-	var buf bytes.Buffer
-	buf.WriteRune(s.read())
-
-	// Read every subsequent ident character into the buffer.
-	// Non-ident characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if isWhitespace(ch) {
-			s.unread()
-			break
-		} else {
-			_, _ = buf.WriteRune(ch)
-		}
-	}
-
-	return TEXT, buf.String()
+func isLetter(ch byte) bool {
+	return ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_'
 }
 
-// scanIdent consumes the current rune and all contiguous ident runes.
-func (s *Scanner) scanNumber() (tok TOKEN, lit string) {
-	// Create a buffer and read the current character into it.
-	var buf bytes.Buffer
-	buf.WriteRune(s.read())
-
-	// Read every subsequent ident character into the buffer.
-	// Non-ident characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if !isDigit(ch) && ch != '_' {
-			s.unread()
-			break
-		} else {
-			_, _ = buf.WriteRune(ch)
-		}
-	}
-
-	return NUMBER, buf.String()
+func isDigit(ch byte) bool {
+	return ch >= '0' && ch <= '9' || ch == '_'
 }
 
-// scanIdent consumes the current rune and all contiguous ident runes.
-func (s *Scanner) scanJinjaTemplate() (tok TOKEN, lit string) {
-	// Create a buffer and read the current character into it.
-	var buf bytes.Buffer
-	buf.WriteRune(s.read())
-
-	// Read every subsequent ident character into the buffer.
-	// Non-ident characters and EOF will cause the loop to exit.
-	for {
-		if ch := s.read(); ch == eof {
-			break
-		} else if !isJinjaIdentifier(ch) {
-			s.unread()
-			break
-		} else {
-			_, _ = buf.WriteRune(ch)
-		}
-	}
-
-	stringVal := buf.String()
-	switch stringVal {
-	case "{{":
-		return START_EXPRESSION, stringVal
-	case "}}":
-		return END_EXPRESSION, stringVal
-
-	case "{%":
-		return START_STATEMENT, stringVal
-	case "%}":
-		return END_STATEMENT, stringVal
-
-	case "{#":
-		return START_COMMENT, stringVal
-	case "#}":
-		return END_COMMENT, stringVal
-	}
-
-	s.unread()
-	return ILLEGAL, stringVal
-}
-
-func isWhitespace(ch rune) bool {
-	return ch == ' ' || ch == '\r' || ch == '\n'
-}
-
-func isLetter(ch rune) bool {
-	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
-}
-
-func isDigit(ch rune) bool {
-	return (ch >= '0' && ch <= '9')
-}
-
-func isJinjaIdentifier(ch rune) bool {
-	return ch == '%' || ch == '#' || ch == '{' || ch == '}'
+func newToken(tokenType TokenType, ch byte) Token {
+	return Token{Token: tokenType, Value: string(ch)}
 }
