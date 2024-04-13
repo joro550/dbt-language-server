@@ -32,11 +32,18 @@ const (
 	MINUS
 	SLASH
 	ASTERIKS
-	LT
-	GT
 	COMMA
 	BANG
+	COLLECTION
 	SEMI_COLON
+	START_COLLECTION
+	END_COLLECTION
+	QUOTE
+
+	LT
+	GT
+	EQ
+	NOT_EQ
 
 	START_EXPRESSION
 	START_STATEMENT
@@ -85,11 +92,11 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
-func (l *Lexer) peekChar() {
+func (l *Lexer) peekChar() byte {
 	if l.readPosition >= len(l.input) {
-		l.ch = 0
+		return 0
 	} else {
-		l.ch = l.input[l.readPosition]
+		return l.input[l.readPosition]
 	}
 }
 
@@ -99,8 +106,79 @@ func (l *Lexer) NextToken() Token {
 	l.skipWhitespace()
 
 	switch l.ch {
+
+	case '{':
+		nextChar := l.peekChar()
+
+		switch nextChar {
+		case '{':
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: START_EXPRESSION, Value: literal}
+
+		case '%':
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: START_STATEMENT, Value: literal}
+		case '#':
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: START_COMMENT, Value: literal}
+		default:
+			tok = newToken(LEFT_BRACE, l.ch)
+		}
+
+	case '%':
+		nextChar := l.peekChar()
+		if nextChar == '}' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: END_STATEMENT, Value: literal}
+
+		} else {
+			tok = newToken(ASSIGN, l.ch)
+		}
+
+	case '#':
+		nextChar := l.peekChar()
+		if nextChar == '}' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: END_COMMENT, Value: literal}
+
+		} else {
+			tok = newToken(ASSIGN, l.ch)
+		}
+
+	case '}':
+		nextChar := l.peekChar()
+		if nextChar == '}' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: END_EXPRESSION, Value: literal}
+
+		} else {
+			tok = newToken(RIGHT_BRACE, l.ch)
+		}
+
 	case '=':
-		tok = newToken(ASSIGN, l.ch)
+		nextChar := l.peekChar()
+
+		if nextChar == '=' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: EQ, Value: literal}
+
+		} else {
+			tok = newToken(ASSIGN, l.ch)
+		}
 	case '(':
 		tok = newToken(LEFT_BRACKET, l.ch)
 	case ')':
@@ -112,7 +190,16 @@ func (l *Lexer) NextToken() Token {
 	case '/':
 		tok = newToken(SLASH, l.ch)
 	case '!':
-		tok = newToken(BANG, l.ch)
+		nextChar := l.peekChar()
+		if nextChar == '=' {
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: NOT_EQ, Value: literal}
+		} else {
+			tok = newToken(BANG, l.ch)
+		}
+
 	case '<':
 		tok = newToken(LT, l.ch)
 	case '>':
@@ -121,9 +208,16 @@ func (l *Lexer) NextToken() Token {
 		tok = newToken(COMMA, l.ch)
 	case ';':
 		tok = newToken(SEMI_COLON, l.ch)
+	case '[':
+		tok = newToken(START_COLLECTION, l.ch)
+	case ']':
+		tok = newToken(END_COLLECTION, l.ch)
+	case '"':
+		tok = newToken(QUOTE, l.ch)
 	case 0:
 		tok.Token = EOF
 		tok.Value = ""
+
 	default:
 		if isLetter(l.ch) {
 			tok.Value = l.readIdentifier()
@@ -136,6 +230,7 @@ func (l *Lexer) NextToken() Token {
 		}
 
 	}
+
 	l.readChar()
 	return tok
 }
