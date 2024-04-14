@@ -3,14 +3,45 @@ package jinja
 import "testing"
 
 func Test_NextToken(t *testing.T) {
-	input := "=+-();"
+	input := "{{ =+-(); }}"
 	tests := []Token{
+		{Token: START_EXPRESSION, Value: "{{"},
 		{Token: ASSIGN, Value: "="},
 		{Token: PLUS, Value: "+"},
 		{Token: MINUS, Value: "-"},
 		{Token: LEFT_BRACKET, Value: "("},
 		{Token: RIGHT_BRACKET, Value: ")"},
 		{Token: SEMI_COLON, Value: ";"},
+		{Token: END_EXPRESSION, Value: "}}"},
+		{Token: EOF, Value: ""},
+	}
+
+	lexer := NewJinjaLexer(input)
+	for i, tt := range tests {
+		tok := lexer.NextToken()
+
+		if tok.Token != tt.Token {
+			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Token, tok.Token)
+		}
+
+		if tok.Value != tt.Value {
+			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Value, tok.Value)
+		}
+	}
+}
+
+func Test_NextTextToken(t *testing.T) {
+	input := "hello my name is joro {{ =+-(); }}"
+	tests := []Token{
+		{Token: TEXT, Value: "hello my name is joro "},
+		{Token: START_EXPRESSION, Value: "{{"},
+		{Token: ASSIGN, Value: "="},
+		{Token: PLUS, Value: "+"},
+		{Token: MINUS, Value: "-"},
+		{Token: LEFT_BRACKET, Value: "("},
+		{Token: RIGHT_BRACKET, Value: ")"},
+		{Token: SEMI_COLON, Value: ";"},
+		{Token: END_EXPRESSION, Value: "}}"},
 		{Token: EOF, Value: ""},
 	}
 
@@ -29,8 +60,9 @@ func Test_NextToken(t *testing.T) {
 }
 
 func Test_Identifiers(t *testing.T) {
-	input := "set result = [\"thing\"]"
+	input := "{{ set result = [\"thing\"] }}"
 	tests := []Token{
+		{Token: START_EXPRESSION, Value: "{{"},
 		{Token: SET, Value: "set"},
 		{Token: IDENT, Value: "result"},
 		{Token: ASSIGN, Value: "="},
@@ -39,6 +71,8 @@ func Test_Identifiers(t *testing.T) {
 		{Token: IDENT, Value: "thing"},
 		{Token: QUOTE, Value: "\""},
 		{Token: END_COLLECTION, Value: "]"},
+		{Token: END_EXPRESSION, Value: "}}"},
+		{Token: EOF, Value: ""},
 	}
 
 	lexer := NewJinjaLexer(input)
