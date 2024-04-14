@@ -246,15 +246,22 @@ func (l *Lexer) nextJinjaToken() Token {
 	case '=':
 		nextChar := l.peekChar()
 
-		if nextChar == '=' {
+		switch nextChar {
+		case '=':
 			ch := l.ch
 			l.readChar()
 			literal := string(ch) + string(l.ch)
 			tok = Token{Token: EQ, Value: literal}
+		case '!':
+			ch := l.ch
+			l.readChar()
+			literal := string(ch) + string(l.ch)
+			tok = Token{Token: NOT_EQ, Value: literal}
+		default:
 
-		} else {
 			tok = newToken(ASSIGN, l.ch)
 		}
+
 	case '(':
 		tok = newToken(LEFT_BRACKET, l.ch)
 	case ')':
@@ -308,11 +315,12 @@ func (l *Lexer) nextJinjaToken() Token {
 			tok.Token = LookupIdent(tok.Value)
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Value = l.readIdentifier()
+			tok.Value = l.readNumber()
 			tok.Token = INT
 			return tok
 		}
-
+		tok.Token = ILLEGAL
+		tok.Value = ""
 	}
 
 	l.readChar()
@@ -342,7 +350,7 @@ func (l *Lexer) readIdentifier() string {
 
 func (l *Lexer) readNumber() string {
 	position := l.position
-	for isDigit(l.ch) {
+	for isDigit(l.ch) || l.ch == '_' {
 		l.readChar()
 	}
 	return l.input[position:l.position]
@@ -353,7 +361,7 @@ func isLetter(ch byte) bool {
 }
 
 func isDigit(ch byte) bool {
-	return ch >= '0' && ch <= '9' || ch == '_'
+	return ch >= '0' && ch <= '9'
 }
 
 func newToken(tokenType TokenType, ch byte) Token {

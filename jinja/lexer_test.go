@@ -2,6 +2,17 @@ package jinja
 
 import "testing"
 
+func Test_DigitToken(t *testing.T) {
+	input := "{{ 5 }}"
+	tests := []Token{
+		{Token: START_STATEMENT, Value: "{{"},
+		{Token: INT, Value: "5"},
+		{Token: END_STATEMENT, Value: "}}"},
+	}
+
+	runTests(input, tests, t)
+}
+
 func Test_NextToken(t *testing.T) {
 	input := "{{ =+-(); }}"
 	tests := []Token{
@@ -16,18 +27,7 @@ func Test_NextToken(t *testing.T) {
 		{Token: EOF, Value: ""},
 	}
 
-	lexer := NewJinjaLexer(input)
-	for i, tt := range tests {
-		tok := lexer.NextToken()
-
-		if tok.Token != tt.Token {
-			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Token, tok.Token)
-		}
-
-		if tok.Value != tt.Value {
-			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Value, tok.Value)
-		}
-	}
+	runTests(input, tests, t)
 }
 
 func Test_NextTextToken(t *testing.T) {
@@ -45,18 +45,7 @@ func Test_NextTextToken(t *testing.T) {
 		{Token: EOF, Value: ""},
 	}
 
-	lexer := NewJinjaLexer(input)
-	for i, tt := range tests {
-		tok := lexer.NextToken()
-
-		if tok.Token != tt.Token {
-			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Token, tok.Token)
-		}
-
-		if tok.Value != tt.Value {
-			t.Fatalf("test[%d] - token type wrong expected %q, got=%q", i, tt.Value, tok.Value)
-		}
-	}
+	runTests(input, tests, t)
 }
 
 func Test_Identifiers(t *testing.T) {
@@ -74,9 +63,12 @@ func Test_Identifiers(t *testing.T) {
 		{Token: END_EXPRESSION, Value: "}}"},
 		{Token: EOF, Value: ""},
 	}
+	runTests(input, tests, t)
+}
 
+func runTests(input string, tokens []Token, t *testing.T) {
 	lexer := NewJinjaLexer(input)
-	for i, tt := range tests {
+	for i, tt := range tokens {
 		tok := lexer.NextToken()
 
 		if tok.Value != tt.Value {
