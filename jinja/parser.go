@@ -1,7 +1,5 @@
 package jinja
 
-import "fmt"
-
 type Parser struct {
 	l         *Lexer
 	curToken  Token
@@ -29,8 +27,6 @@ func NewParser(l *Lexer) *Parser {
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
-
-	fmt.Println(p.curToken.Value, p.peekToken.Value)
 }
 
 func (p *Parser) currentTokenIs(t TokenType) bool {
@@ -75,6 +71,7 @@ func (p *Parser) parseStatement() Statement {
 
 func (p *Parser) parseSetStatement() Statement {
 	p.nextToken()
+
 	switch p.curToken.Token {
 	case SET:
 		return p.parseSetStatment()
@@ -85,13 +82,13 @@ func (p *Parser) parseSetStatement() Statement {
 func (p *Parser) parseSetStatment() *SetStatment {
 	stmt := &SetStatment{Token: p.curToken}
 
-	if !p.peekTokenIs(IDENT) {
+	if !p.expectPeek(IDENT) {
 		return nil
 	}
 
 	stmt.Name = &Identifier{Token: p.curToken, Value: p.curToken.Value}
 
-	if !p.peekTokenIs(ASSIGN) {
+	if !p.expectPeek(ASSIGN) {
 		return nil
 	}
 

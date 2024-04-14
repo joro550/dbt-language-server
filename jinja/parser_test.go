@@ -5,7 +5,7 @@ import (
 )
 
 func TestSetStatement(t *testing.T) {
-	input := "{{ set name = 5 }}"
+	input := "{% set name = 5 %}"
 
 	lexer := NewJinjaLexer(input)
 	parser := NewParser(lexer)

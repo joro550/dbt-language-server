@@ -5,9 +5,9 @@ import "testing"
 func Test_DigitToken(t *testing.T) {
 	input := "{{ 5 }}"
 	tests := []Token{
-		{Token: START_STATEMENT, Value: "{{"},
+		{Token: START_EXPRESSION, Value: "{{"},
 		{Token: INT, Value: "5"},
-		{Token: END_STATEMENT, Value: "}}"},
+		{Token: END_EXPRESSION, Value: "}}"},
 	}
 
 	runTests(input, tests, t)
