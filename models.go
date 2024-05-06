@@ -178,11 +178,13 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
+			logger.Infof("Adding key %v with filename %v", key, fileName)
 			schema, schemaExists := schemas[fileName]
 
 			var node Node
 			if schemaExists {
 				node = schema
+				node.OriginalPath = fmt.Sprintf("file://%v", path)
 			} else {
 				node = Node{
 					Name:         fileName,
