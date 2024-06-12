@@ -178,17 +178,19 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			fileName := strings.ReplaceAll(info.Name(), ".sql", "")
 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
+			logger.Infof("Adding key %v with filename %v", key, fileName)
 			schema, schemaExists := schemas[fileName]
 
 			var node Node
 			if schemaExists {
 				node = schema
+				node.OriginalPath = fmt.Sprintf("file://%v", path)
 			} else {
 				node = Node{
 					Name:         fileName,
 					RawCode:      string(fileContent),
 					Columns:      map[string]NodeColumn{},
-					OriginalPath: fmt.Sprintf("file://", path),
+					OriginalPath: fmt.Sprintf("file://%v", path),
 				}
 			}
 
@@ -236,7 +238,7 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			for _, macro := range parser.GetMacroDefinitions(fileString) {
 				key := fmt.Sprintf("macro.%v.%v", projectName, macro.ModelName)
 				manifest.Macros[key] = Macro{
-					OriginalPath: fmt.Sprintf("file://", path),
+					OriginalPath: fmt.Sprintf("file://%v", path),
 					Name:         macro.ModelName,
 				}
 			}

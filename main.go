@@ -51,8 +51,8 @@ func main() {
 func initialize(context *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	initLog := commonlog.GetLoggerf("%s.init", lsName)
 
+	initLog.Infof("ROOT_DIR %v", params.WorkspaceFolders)
 	ROOT_DIR = params.WorkspaceFolders[0].URI
-	initLog.Infof("ROOT_DIR %v", ROOT_DIR)
 
 	settings, err := LoadSettings(ROOT_DIR)
 	if err != nil {
@@ -121,7 +121,6 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 
 	file := getModelNameFromFilePath(params.TextDocument.URI)
 	key := fmt.Sprintf("model.%s.%s", manifest.Metadata.ProjectName, file)
-
 	val, ok := manifest.Nodes[key]
 	if !ok {
 		definitionLog.Infof("could not find initial key %v", key)
@@ -139,6 +138,7 @@ func definitionHandler(context *glsp.Context, params *protocol.DefinitionParams)
 		return nil, err
 	}
 
+	definitionLog.Infof("Got definition: %v", model.FileName)
 	return protocol.Location{
 		URI: model.FileName,
 		Range: protocol.Range{

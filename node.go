@@ -69,6 +69,7 @@ func (n Node) GetDefinition(params DefinitionRequest) (DefinitionResponse, error
 
 		// Are we in a jinja block ?
 		if positionWithinRange(rawPosition, positions) {
+			logger.Info("We are within a jinja block")
 			return n.getJinjaDefinition(params, rawPosition, fileString, parser)
 		} else {
 			logger.Info("Not in a jinja block")
@@ -90,6 +91,8 @@ func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, cont
 		if rawPosition >= tag.Range.Start && rawPosition <= tag.Range.End {
 			model := fmt.Sprintf("model.%s.%s", params.ProjectName, tag.ModelName)
 			node, ok := params.Manifest.Nodes[model]
+
+			logger.Infof("looking for model %v", model)
 			if !ok {
 				return DefinitionResponse{}, nil
 			}
@@ -104,6 +107,8 @@ func (n Node) getJinjaDefinition(params DefinitionRequest, rawPosition int, cont
 		if rawPosition >= macro.Range.Start && rawPosition <= macro.Range.End {
 			model := fmt.Sprintf("macro.%s.%s", params.ProjectName, macro.ModelName)
 			node, ok := params.Manifest.Macros[model]
+
+			logger.Infof("looking for macro %v", model)
 			if !ok {
 				return DefinitionResponse{}, nil
 			}
