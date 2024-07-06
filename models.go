@@ -180,17 +180,18 @@ func (settings ProjectSettings) PredictManifestFile(projectName string, schemas 
 			key := fmt.Sprintf("model.%v.%v", projectName, fileName)
 			logger.Infof("Adding key %v with filename %v", key, fileName)
 			schema, schemaExists := schemas[fileName]
+			filePath := filepath.Join(path)
 
 			var node Node
 			if schemaExists {
 				node = schema
-				node.OriginalPath = fmt.Sprintf("file://%v", path)
+				node.OriginalPath = fmt.Sprintf("file://%v", filePath)
 			} else {
 				node = Node{
 					Name:         fileName,
 					RawCode:      string(fileContent),
 					Columns:      map[string]NodeColumn{},
-					OriginalPath: fmt.Sprintf("file://%v", path),
+					OriginalPath: fmt.Sprintf("file://%v", filePath),
 				}
 			}
 
